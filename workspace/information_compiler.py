@@ -836,6 +836,26 @@ def normalize_whitespace_and_punctuation(text: str) -> str:
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
+def cleanup_role_variants(role: str) -> str:
+    """
+    Clean up role by:
+    1. Replacing 'Rm' with 'Room'
+    2. Removing numbered suffixes like (1), (2), (3), etc.
+    """
+    if not role:
+        return role
+    
+    # Replace Rm with Room
+    cleaned = re.sub(r'\bRm\b', 'Room', role, flags=re.IGNORECASE)
+    
+    # Remove numbered suffixes like (1), (2), etc.
+    cleaned = re.sub(r'\s*\(\d+\)\s*$', '', cleaned)
+    
+    # Normalize whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    return cleaned
+
 def clean_and_canonicalize_role(raw_role: str) -> str:
     """Clean, expand, canonicalize, and format a single role."""
     if _is_blankish(raw_role):
@@ -1047,6 +1067,22 @@ for seg in year_ranges:
                 if r.casefold() not in seen_in_dist:
                     roles_by_loc[dist_loc].append(r)
                     seen_in_dist.add(r.casefold())
+    
+    # Clean up all roles: standardize Room/Rm, remove numbered variants, deduplicate
+    for loc_name in roles_by_loc:
+        roles = roles_by_loc[loc_name]
+        cleaned_roles = []
+        seen = set()
+        for role in roles:
+            # Apply variant cleanup (Room/Rm standardization, remove numbers)
+            cleaned = cleanup_role_variants(role)
+            if cleaned:
+                # Deduplicate after cleanup
+                key = cleaned.casefold()
+                if key not in seen:
+                    seen.add(key)
+                    cleaned_roles.append(cleaned)
+        roles_by_loc[loc_name] = cleaned_roles
     
     # Rebuild unique locations list without Divisions
     final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]

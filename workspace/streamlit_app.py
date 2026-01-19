@@ -229,16 +229,191 @@ def is_rank_text(text: str) -> bool:
     mapped = map_rank(text)
     return mapped in rank_index
 
-def expand_role(token: str, role_exp) -> str:
-    t = clean_role_token(token)
-    if not t:
+# Enhanced canonicalization with comprehensive synonym rules
+CANON_SYNONYMS = {
+    # CRM / Crime
+    r'^CRM$': 'Crime',
+    r'\bCRM\s*\((\d+)\)': r'Crime (\1)',
+    r'\bCRM\b': 'Crime',
+    
+    # Administration variants
+    r'^ADM$': 'Administration',
+    r'\bADM\b': 'Administration',
+    
+    # Control Room
+    r'^CTRL$': 'Command and Control (Control Room)',
+    r'\bCTRL\b': 'Command and Control (Control Room)',
+    
+    # A&S / Administration and Support
+    r'\bA\s*&\s*S\b': 'Administration and Support',
+    
+    # OSSUC / Operations Sub-unit Commander
+    r'\bOSSUC\b': 'Operations Sub-unit Commander',
+    
+    # ADVC / Assistant Divisional Commander
+    r'\bADVC\b': 'Assistant Divisional Commander',
+    
+    # OPS variants
+    r'\bOPS\s*\((\d+)\)': r'Operations (\1)',
+    r'\bOPS\b': 'Operations',
+    
+    # HQCCC variants (unify all to one canonical form)
+    r'\bHQCCC\s*\((?:OPS\s*RM|Ops\s*Rm)\)': 'Headquarters Command and Control Centre (Operations Room)',
+    r'\bHeadquarters\s+Command\s+and\s+Control\s+Centre\s+(?:Operations|operations)(?:\s+)?(?:Rm|Room|RM)': 'Headquarters Command and Control Centre (Operations Room)',
+    r'\bHQCCC\s*\(operations\s+Room\)': 'Headquarters Command and Control Centre (Operations Room)',
+    r'\bHQCCC\b': 'Headquarters Command and Control Centre',
+    
+    # DVIT / DIVT variants
+    r'\bDIVT\s*(\d+)': r'Divisional Investigation Team \1',
+    r'\bDVIT\s*(\d+)': r'Divisional Investigation Team \1',
+    r'\bDivisional\s+Investigation\s+Team\s*(\d+)': r'Divisional Investigation Team \1',
+    
+    # PSU variants
+    r'\bPSU\s*(\d+)': r'Patrol Sub-unit \1',
+    r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)': r'Patrol Sub-unit \1',
+    
+    # SDS variants
+    r'\bD?SDS\s*(\d+)': r'Special Duties Squad \1',
+    
+    # TFSU
+    r'\bTFSU\b': 'Task Force Sub-unit',
+}
+
+ROLE_ACRONYMS = {
+    "HQCCC", "PTU", "EU", "RCCC", "CCB", "CAPO", "PCRO", "PPRB", 
+    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS"
+}
+
+def smart_title_case_role(text: str) -> str:
+    """Title case while preserving known acronyms (all caps)."""
+    if not text:
+        return text
+    def fix_word(w: str, is_first: bool) -> str:
+        ww = re.sub(r'[()\-/,]', '', w)
+        if ww.upper() in ROLE_ACRONYMS:
+            return w.upper()
+        if not is_first and ww.lower() in {"and", "of", "the", "in", "on", "for", "to", "with", "at"}:
+            return w.lower()
+        return w[:1].upper() + w[1:].lower()
+    parts = re.split(r'(\s+)', text)
+    out = []
+    word_idx = 0
+    for p in parts:
+        if p.isspace():
+            out.append(p)
+        else:
+            out.append(fix_word(p, is_first=(word_idx == 0)))
+            word_idx += 1
+    return ''.join(out)
+
+def normalize_whitespace_and_punctuation(text: str) -> str:
+    """Insert space before parentheses, collapse spaces."""
+    s = text
+    # Insert space before (
+    s = re.sub(r'(?<=[A-Za-z0-9])\(', ' (', s)
+    # Collapse multiple spaces
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def clean_and_canonicalize_role(raw_role: str) -> str:
+    """Clean, expand, canonicalize, and format a single role."""
+    if _is_blankish(raw_role):
         return ""
-    if t in role_exp:
-        return role_exp[t]
-    t_up = t.upper()
-    if t_up in role_exp:
-        return role_exp[t_up]
-    return t
+    
+    s = str(raw_role).strip()
+    
+    # Remove TEMP/DES patterns first
+    s = re.sub(r'\((?:TEMP|TEMPORARY|DES|DESIGNATE)\)', '', s, flags=re.IGNORECASE)
+    
+    # Normalize spaces
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Reject pure placeholders
+    if not s or s.lower() in {"nan", "none", "null", "-", "()", "", "(temp)", "temp"}:
+        return ""
+    
+    # Apply canonicalization patterns (case-insensitive)
+    for pattern, repl in CANON_SYNONYMS.items():
+        s = re.sub(pattern, repl, s, flags=re.IGNORECASE)
+    
+    # Normalize whitespace and punctuation
+    s = normalize_whitespace_and_punctuation(s)
+    
+    # Apply title casing (preserves acronyms)
+    s = smart_title_case_role(s)
+    
+    # Generic letter/number squeeze: "Xyz9" → "Xyz 9"
+    s = re.sub(r'([A-Za-z]+)(\d+)', r'\1 \2', s)
+    
+    # Remove trailing "Team" if it matches the same code
+    s = re.sub(r'^(.+\s\d+)\s+Team$', r'\1', s, flags=re.IGNORECASE)
+    
+    # Final cleanup
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Reject if still ends with (TEMP)
+    if re.search(r'\(TEMP(?:ORARY)?\)$', s, flags=re.IGNORECASE):
+        return ""
+    
+    return s
+
+def cleanup_role_variants(role):
+    """
+    Clean up role by:
+    1. Replacing 'Rm' with 'Room'
+    2. Removing numbered suffixes like (1), (2), (3), etc.
+    """
+    if not role:
+        return role
+    
+    # Replace Rm with Room
+    cleaned = re.sub(r'\bRm\b', 'Room', role, flags=re.IGNORECASE)
+    
+    # Remove numbered suffixes like (1), (2), etc.
+    cleaned = re.sub(r'\s*\(\d+\)\s*$', '', cleaned)
+    
+    # Normalize whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    return cleaned
+
+def extract_roles_from_row(r):
+    """Extract and canonicalize roles from a row."""
+    roles_out = []
+    
+    # 1) Prefer Designation Description
+    dd_raw = r.get('designation_desc') or ''
+    if dd_raw and not is_rank_text(dd_raw):
+        dd = clean_and_canonicalize_role(dd_raw)
+        if dd:
+            roles_out.append(dd)
+    
+    # 2) Add Designation if non-rank and different
+    d_raw = r.get('designation') or ''
+    if d_raw and not is_rank_text(d_raw):
+        d = clean_and_canonicalize_role(d_raw)
+        if d and (not roles_out or d.casefold() != roles_out[0].casefold()):
+            roles_out.append(d)
+    
+    # 3) Post Type only if non-rank
+    pt_raw = r.get('post_type') or ''
+    if pt_raw and not is_rank_text(pt_raw):
+        p = clean_and_canonicalize_role(pt_raw)
+        if p:
+            roles_out.append(p)
+    
+    # Deduplicate (case-insensitive)
+    seen = set()
+    clean_list = []
+    for x in roles_out:
+        if not x or x.lower() in {"nan", "none", "null"}:
+            continue
+        key = x.casefold()
+        if key not in seen:
+            seen.add(key)
+            clean_list.append(x)
+    
+    return clean_list
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
@@ -420,36 +595,6 @@ def process_excel_file(uploaded_file):
                 sub['location']
             ).apply(lambda x: normalize_location(x, STARTER_LOCATION_ALIASES))
             
-            def extract_roles_from_row(r):
-                roles_out = []
-                dd_raw = r.get('designation_desc') or ''
-                dd = clean_role_token(expand_role(dd_raw, STARTER_ROLE_EXPANSIONS))
-                if dd:
-                    roles_out.append(dd)
-                
-                d_raw = r.get('designation') or ''
-                if d_raw and not is_rank_text(d_raw):
-                    d = clean_role_token(expand_role(d_raw, STARTER_ROLE_EXPANSIONS))
-                    if d and (not dd or d.casefold() != dd.casefold()):
-                        roles_out.append(d)
-                
-                pt = r.get('post_type') or ''
-                if pt and not is_rank_text(pt):
-                    p = clean_role_token(expand_role(pt, STARTER_ROLE_EXPANSIONS))
-                    if p:
-                        roles_out.append(p)
-                
-                seen = set()
-                clean_list = []
-                for x in roles_out:
-                    if not x or x.lower() in {"nan", "none", "null"}:
-                        continue
-                    key = x.casefold()
-                    if key not in seen:
-                        seen.add(key)
-                        clean_list.append(x)
-                return clean_list
-            
             sub['role_list'] = sub.apply(extract_roles_from_row, axis=1)
             
             roles_by_loc = {}
@@ -463,9 +608,13 @@ def process_excel_file(uploaded_file):
                 for role in roles_here:
                     if not role or role.upper() == "LEAVE RESERVE":
                         continue
-                    key = role.casefold()
+                    # Canonicalize role one more time for location-level dedup
+                    role_canonical = clean_and_canonicalize_role(role)
+                    if not role_canonical:
+                        continue
+                    key = role_canonical.casefold()
                     if key not in seen_by_loc[l]:
-                        roles_by_loc[l].append(role)
+                        roles_by_loc[l].append(role_canonical)
                         seen_by_loc[l].add(key)
             
             unique_locs = []
@@ -477,10 +626,79 @@ def process_excel_file(uploaded_file):
                     seen_locs.add(l)
                     unique_locs.append(l)
             
+            # ===== DIVISION → DISTRICT MERGE =====
+            # Recognize DIV/DIVISION and DIST/DISTRICT patterns
+            def extract_base_and_type(loc_name: str):
+                """Extract base and type from location name."""
+                s = str(loc_name or "").strip().upper()
+                s = re.sub(r'\s+', ' ', s)
+                
+                typ = None
+                if re.search(r'\bDIV(?:ISION)?\.?\b', s):
+                    typ = 'DIVISION'
+                elif re.search(r'\bDIST(?:RICT)?\.?\b', s):
+                    typ = 'DISTRICT'
+                
+                # Remove type tokens to get base
+                base = s
+                base = re.sub(r'\bDIV(?:ISION)?\.?\b', '', base)
+                base = re.sub(r'\bDIST(?:RICT)?\.?\b', '', base)
+                base = re.sub(r'\s+', ' ', base).strip()
+                
+                return base, typ
+            
+            # Map each base to its locations and types
+            base_to_locs = {}
+            for loc_name in unique_locs:
+                base, typ = extract_base_and_type(loc_name)
+                if base:
+                    base_to_locs.setdefault(base, {'DIVISION': None, 'DISTRICT': None})
+                    if typ:
+                        base_to_locs[base][typ] = loc_name
+            
+            # Find Division→District merges and collect them
+            division_to_district_merge = {}
+            for base, locs_dict in base_to_locs.items():
+                if locs_dict['DIVISION'] and locs_dict['DISTRICT']:
+                    # Both exist: merge Division into District
+                    div_loc = locs_dict['DIVISION']
+                    dist_loc = locs_dict['DISTRICT']
+                    division_to_district_merge[div_loc] = dist_loc
+            
+            # Merge roles from Divisions into Districts
+            for div_loc, dist_loc in division_to_district_merge.items():
+                div_roles = roles_by_loc.pop(div_loc, [])
+                if dist_loc in roles_by_loc:
+                    # Merge: add div roles to district, deduplicate
+                    seen_in_dist = {r.casefold() for r in roles_by_loc[dist_loc]}
+                    for r in div_roles:
+                        if r.casefold() not in seen_in_dist:
+                            roles_by_loc[dist_loc].append(r)
+                            seen_in_dist.add(r.casefold())
+            
+            # Clean up all roles: standardize Room/Rm, remove numbered variants, deduplicate
+            for loc_name in roles_by_loc:
+                roles = roles_by_loc[loc_name]
+                cleaned_roles = []
+                seen = set()
+                for role in roles:
+                    # Apply variant cleanup (Room/Rm standardization, remove numbers)
+                    cleaned = cleanup_role_variants(role)
+                    if cleaned:
+                        # Deduplicate after cleanup
+                        key = cleaned.casefold()
+                        if key not in seen:
+                            seen.add(key)
+                            cleaned_roles.append(cleaned)
+                roles_by_loc[loc_name] = cleaned_roles
+            
+            # Rebuild unique locations list without Divisions
+            final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
+            
             enhanced_ranges.append({
                 'true_rank': tr,
                 'year_range': seg['year_range'],
-                'locations': unique_locs,
+                'locations': final_unique_locs,
                 'roles_by_location': roles_by_loc
             })
         
