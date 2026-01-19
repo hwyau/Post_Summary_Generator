@@ -229,16 +229,140 @@ def is_rank_text(text: str) -> bool:
     mapped = map_rank(text)
     return mapped in rank_index
 
-def expand_role(token: str, role_exp) -> str:
-    t = clean_role_token(token)
-    if not t:
+# Enhanced canonicalization with better patterns
+CANON_SYNONYMS = {
+    # OPS variants
+    r'\bOPS\s*\((\d+)\)\b': r'Operations (\1)',
+    r'\bOPS\s*\((\d+)\)\s*\(TEMP(?:ORARY)?\)': r'Operations (\1)',
+    r'\bOPS\b': 'Operations',
+    
+    # Crime variants
+    r'\bCRM\s*\((\d+)\)\b': r'Crime (\1)',
+    r'\bCRM\s*\((\d+)\)\s*\(TEMP(?:ORARY)?\)': r'Crime (\1)',
+    r'\bCRM\b': 'Crime',
+    
+    # DVIT / DIVT variants
+    r'\bD(?:IV)?IT\s*(\d+)\b': r'Divisional Investigation Team \1',
+    r'\bDivisional\s+Investigation\s+Team\s*(\d+)\b': r'Divisional Investigation Team \1',
+    
+    # PSU variants
+    r'\bPSU\s*(\d+)\b': r'Patrol Sub-unit \1',
+    r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)\b': r'Patrol Sub-unit \1',
+    
+    # MESU / MESUC variants
+    r'\bMESUC?\s*(\d*)\b': lambda m: f'Miscellaneous Enquiries Sub-unit{"" if not m.group(1) else f" {m.group(1)}"} Commander' if 'MESUC' in m.group(0).upper() else f'Miscellaneous Enquiries Sub-unit{f" {m.group(1)}" if m.group(1) else ""}',
+    
+    # SDS variants
+    r'\bD?SDS\s*(\d+)\b': r'Special Duties Squad \1',
+    
+    # TFSU
+    r'\bTFSU\b': 'Task Force Sub-unit',
+    
+    # Team variants
+    r'\bTeam\s*(\d+[A-Z]?)\b': r'Team \1',
+    
+    # HQCCC variants
+    r'\bHQCCC\s*\(OPS\s*RM\)\b': 'Headquarters Command and Control Centre (Operations Room)',
+    r'\bHQCCC\b': 'Headquarters Command and Control Centre',
+}
+
+ROLE_ACRONYMS = {
+    "PTU", "EU", "RCCC", "HQCCC", "DVIT", "PSU", "PCRO", "CCB", "CAPO", "SCIU",
+    "SDS", "DSDS", "MESU", "MESUC", "TFSU", "ADC", "DDC", "DC", "RI", "ES", "OPS"
+}
+
+def smart_title_case_role(text: str) -> str:
+    """Title case while preserving known acronyms."""
+    if not text:
+        return text
+    def fix_word(w: str, is_first: bool) -> str:
+        ww = re.sub(r'[()\-/,]', '', w)
+        if ww.upper() in ROLE_ACRONYMS:
+            return w.upper()
+        if not is_first and ww.lower() in {"and", "of", "the", "in", "on", "for", "to", "with", "at"}:
+            return w.lower()
+        return w[:1].upper() + w[1:].lower()
+    parts = re.split(r'(\s+)', text)
+    out = []
+    word_idx = 0
+    for p in parts:
+        if p.isspace():
+            out.append(p)
+        else:
+            out.append(fix_word(p, is_first=(word_idx == 0)))
+            word_idx += 1
+    return ''.join(out)
+
+def clean_and_canonicalize_role(raw_role: str) -> str:
+    """Clean, canonicalize, and deduplicate a single role."""
+    if _is_blankish(raw_role):
         return ""
-    if t in role_exp:
-        return role_exp[t]
-    t_up = t.upper()
-    if t_up in role_exp:
-        return role_exp[t_up]
-    return t
+    
+    s = str(raw_role).strip()
+    
+    # Remove TEMP/DES patterns
+    s = re.sub(r'\((?:TEMP|TEMPORARY|DES|DESIGNATE)\)', '', s, flags=re.IGNORECASE)
+    
+    # Normalize spaces
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Reject pure placeholders
+    if not s or s.lower() in {"nan", "none", "null", "-", "()", "", "(temp)", "temp"}:
+        return ""
+    
+    # Apply canonicalization patterns
+    for pattern, repl in CANON_SYNONYMS.items():
+        s = re.sub(pattern, repl, s, flags=re.IGNORECASE)
+    
+    # Final normalization
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Apply title casing
+    s = smart_title_case_role(s)
+    
+    # Final cleanup: reject if still ends with (TEMP) etc after all processing
+    if re.search(r'\(TEMP(?:ORARY)?\)$', s, flags=re.IGNORECASE):
+        return ""
+    
+    return s
+
+def extract_roles_from_row(r):
+    """Extract and canonicalize roles from a row."""
+    roles_out = []
+    
+    # 1) Prefer Designation Description
+    dd_raw = r.get('designation_desc') or ''
+    if dd_raw and not is_rank_text(dd_raw):
+        dd = clean_and_canonicalize_role(dd_raw)
+        if dd:
+            roles_out.append(dd)
+    
+    # 2) Add Designation if non-rank and different
+    d_raw = r.get('designation') or ''
+    if d_raw and not is_rank_text(d_raw):
+        d = clean_and_canonicalize_role(d_raw)
+        if d and (not roles_out or d.casefold() != roles_out[0].casefold()):
+            roles_out.append(d)
+    
+    # 3) Post Type only if non-rank
+    pt_raw = r.get('post_type') or ''
+    if pt_raw and not is_rank_text(pt_raw):
+        p = clean_and_canonicalize_role(pt_raw)
+        if p:
+            roles_out.append(p)
+    
+    # Deduplicate (case-insensitive)
+    seen = set()
+    clean_list = []
+    for x in roles_out:
+        if not x or x.lower() in {"nan", "none", "null"}:
+            continue
+        key = x.casefold()
+        if key not in seen:
+            seen.add(key)
+            clean_list.append(x)
+    
+    return clean_list
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
@@ -419,36 +543,6 @@ def process_excel_file(uploaded_file):
                 loc_desc.notna() & (loc_desc.astype(str).str.strip() != ''),
                 sub['location']
             ).apply(lambda x: normalize_location(x, STARTER_LOCATION_ALIASES))
-            
-            def extract_roles_from_row(r):
-                roles_out = []
-                dd_raw = r.get('designation_desc') or ''
-                dd = clean_role_token(expand_role(dd_raw, STARTER_ROLE_EXPANSIONS))
-                if dd:
-                    roles_out.append(dd)
-                
-                d_raw = r.get('designation') or ''
-                if d_raw and not is_rank_text(d_raw):
-                    d = clean_role_token(expand_role(d_raw, STARTER_ROLE_EXPANSIONS))
-                    if d and (not dd or d.casefold() != dd.casefold()):
-                        roles_out.append(d)
-                
-                pt = r.get('post_type') or ''
-                if pt and not is_rank_text(pt):
-                    p = clean_role_token(expand_role(pt, STARTER_ROLE_EXPANSIONS))
-                    if p:
-                        roles_out.append(p)
-                
-                seen = set()
-                clean_list = []
-                for x in roles_out:
-                    if not x or x.lower() in {"nan", "none", "null"}:
-                        continue
-                    key = x.casefold()
-                    if key not in seen:
-                        seen.add(key)
-                        clean_list.append(x)
-                return clean_list
             
             sub['role_list'] = sub.apply(extract_roles_from_row, axis=1)
             

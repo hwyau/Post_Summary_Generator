@@ -750,6 +750,103 @@ def is_rank_text(text: str) -> bool:
     mapped = map_rank(text)
     return mapped in rank_index
 
+# Enhanced canonicalization with better patterns
+CANON_SYNONYMS = {
+    # OPS variants
+    r'\bOPS\s*\((\d+)\)\b': r'Operations (\1)',
+    r'\bOPS\s*\((\d+)\)\s*\(TEMP(?:ORARY)?\)': r'Operations (\1)',
+    r'\bOPS\b': 'Operations',
+    
+    # Crime variants
+    r'\bCRM\s*\((\d+)\)\b': r'Crime (\1)',
+    r'\bCRM\s*\((\d+)\)\s*\(TEMP(?:ORARY)?\)': r'Crime (\1)',
+    r'\bCRM\b': 'Crime',
+    
+    # DVIT / DIVT variants
+    r'\bD(?:IV)?IT\s*(\d+)\b': r'Divisional Investigation Team \1',
+    r'\bDivisional\s+Investigation\s+Team\s*(\d+)\b': r'Divisional Investigation Team \1',
+    
+    # PSU variants
+    r'\bPSU\s*(\d+)\b': r'Patrol Sub-unit \1',
+    r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)\b': r'Patrol Sub-unit \1',
+    
+    # MESU / MESUC variants
+    r'\bMESUC?\s*(\d*)\b': lambda m: f'Miscellaneous Enquiries Sub-unit{"" if not m.group(1) else f" {m.group(1)}"} Commander' if 'MESUC' in m.group(0).upper() else f'Miscellaneous Enquiries Sub-unit{f" {m.group(1)}" if m.group(1) else ""}',
+    
+    # SDS variants
+    r'\bD?SDS\s*(\d+)\b': r'Special Duties Squad \1',
+    
+    # TFSU
+    r'\bTFSU\b': 'Task Force Sub-unit',
+    
+    # Team variants
+    r'\bTeam\s*(\d+[A-Z]?)\b': r'Team \1',
+    
+    # HQCCC variants
+    r'\bHQCCC\s*\(OPS\s*RM\)\b': 'Headquarters Command and Control Centre (Operations Room)',
+    r'\bHQCCC\b': 'Headquarters Command and Control Centre',
+}
+
+ROLE_ACRONYMS = {
+    "PTU", "EU", "RCCC", "HQCCC", "DVIT", "PSU", "PCRO", "CCB", "CAPO", "SCIU",
+    "SDS", "DSDS", "MESU", "MESUC", "TFSU", "ADC", "DDC", "DC", "RI", "ES", "OPS"
+}
+
+def smart_title_case_role(text: str) -> str:
+    """Title case while preserving known acronyms."""
+    if not text:
+        return text
+    def fix_word(w: str, is_first: bool) -> str:
+        ww = re.sub(r'[()\-/,]', '', w)
+        if ww.upper() in ROLE_ACRONYMS:
+            return w.upper()
+        if not is_first and ww.lower() in {"and", "of", "the", "in", "on", "for", "to", "with", "at"}:
+            return w.lower()
+        return w[:1].upper() + w[1:].lower()
+    parts = re.split(r'(\s+)', text)
+    out = []
+    word_idx = 0
+    for p in parts:
+        if p.isspace():
+            out.append(p)
+        else:
+            out.append(fix_word(p, is_first=(word_idx == 0)))
+            word_idx += 1
+    return ''.join(out)
+
+def clean_and_canonicalize_role(raw_role: str) -> str:
+    """Clean, canonicalize, and deduplicate a single role."""
+    if _is_blankish(raw_role):
+        return ""
+    
+    s = str(raw_role).strip()
+    
+    # Remove TEMP/DES patterns
+    s = re.sub(r'\((?:TEMP|TEMPORARY|DES|DESIGNATE)\)', '', s, flags=re.IGNORECASE)
+    
+    # Normalize spaces
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Reject pure placeholders
+    if not s or s.lower() in {"nan", "none", "null", "-", "()", "", "(temp)", "temp"}:
+        return ""
+    
+    # Apply canonicalization patterns
+    for pattern, repl in CANON_SYNONYMS.items():
+        s = re.sub(pattern, repl, s, flags=re.IGNORECASE)
+    
+    # Final normalization
+    s = re.sub(r'\s+', ' ', s).strip()
+    
+    # Apply title casing
+    s = smart_title_case_role(s)
+    
+    # Final cleanup: reject if still ends with (TEMP) etc after all processing
+    if re.search(r'\(TEMP(?:ORARY)?\)$', s, flags=re.IGNORECASE):
+        return ""
+    
+    return s
+
 # ========= STEP 9: BUILD ENHANCED RANGES (locations + roles per location) =========
 def consolidate_row_roles(roles_out: list[str]) -> list[str]:
     """
