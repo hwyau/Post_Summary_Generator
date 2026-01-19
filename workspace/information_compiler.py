@@ -9,6 +9,8 @@ import pandas as pd
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
 from datetime import datetime
 
 # ========= CLI FLAGS + Interactive Filename Prompt (with last-used memory) =========
@@ -997,25 +999,30 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
     """
     doc = Document()
     
-    # Rank expansion mapping
+    # Rank expansion mapping (without "of Police")
     rank_full_names = {
         'PC': 'Police Constable',
         'SPC': 'Senior Police Constable',
         'SGT': 'Sergeant',
         'SSGT': 'Station Sergeant',
-        'PI': 'Probationary Inspector of Police',
-        'IP': 'Inspector of Police',
-        'SIP': 'Senior Inspector of Police',
-        'IP/SIP': 'Inspector of Police / Senior Inspector of Police',
-        'CIP': 'Chief Inspector of Police',
-        'SP': 'Superintendent of Police',
-        'SSP': 'Senior Superintendent of Police',
-        'CSP': 'Chief Superintendent of Police',
-        'ACP': 'Assistant Commissioner of Police',
-        'SACP': 'Senior Assistant Commissioner of Police',
-        'DCP': 'Deputy Commissioner of Police',
-        'CP': 'Commissioner of Police',
+        'PI': 'Probationary Inspector',
+        'IP': 'Inspector',
+        'SIP': 'Senior Inspector',
+        'IP/SIP': 'Inspector / Senior Inspector',
+        'CIP': 'Chief Inspector',
+        'SP': 'Superintendent',
+        'SSP': 'Senior Superintendent',
+        'CSP': 'Chief Superintendent',
+        'ACP': 'Assistant Commissioner',
+        'SACP': 'Senior Assistant Commissioner',
+        'DCP': 'Deputy Commissioner',
+        'CP': 'Commissioner',
     }
+    
+    # Helper function to shade cell
+    def shade_cell(cell, color):
+        shading_elm = parse_xml(r'<w:shd {} w:fill="{}"/>'.format(nsdecls('w'), color))
+        cell._element.get_or_add_tcPr().append(shading_elm)
     
     # Create table with 3 columns
     table = doc.add_table(rows=1, cols=3)
@@ -1032,8 +1039,9 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
     header_cells[1].text = "Rank"
     header_cells[2].text = "Posting Location & Roles"
     
-    # Format header row - bold and size 13
+    # Format header row - bold, size 13, light blue background
     for cell in header_cells:
+        shade_cell(cell, "ADD8E6")  # Light blue
         for paragraph in cell.paragraphs:
             for run in paragraph.runs:
                 run.bold = True
@@ -1069,8 +1077,9 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
         row_cells[1].text = rank_display
         row_cells[2].text = posting_text
         
-        # Set font size 13 for all cells
+        # Format data rows - white background, size 13
         for cell in row_cells:
+            shade_cell(cell, "FFFFFF")  # White
             for paragraph in cell.paragraphs:
                 for run in paragraph.runs:
                     run.font.size = Pt(13)
