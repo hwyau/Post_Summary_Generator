@@ -599,7 +599,7 @@ if uploaded_file is not None:
             if error:
                 st.error(f"Error processing file: {error}")
             else:
-                st.success(f"✓ Processing complete! Found {len(enhanced_ranges)} rank periods.")
+                st.success("✓ Processing complete!")
                 
                 # Generate Word document
                 doc = generate_word_document(enhanced_ranges)
