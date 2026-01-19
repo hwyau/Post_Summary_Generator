@@ -752,6 +752,13 @@ def is_rank_text(text: str) -> bool:
 
 # Enhanced canonicalization with comprehensive synonym rules
 CANON_SYNONYMS = {
+    # RI / Research and Inspections (multiple variants)
+    r'^RI$': 'Research and Inspections',
+    r'\bRI\b': 'Research and Inspections',
+    r'\bR\s*&\s*I\b': 'Research and Inspections',
+    r'\bR\s*and\s+I\b': 'Research and Inspections',
+    r'\bResearch\s+&\s+Inspections\b': 'Research and Inspections',
+    
     # CRM / Crime
     r'^CRM$': 'Crime',
     r'\bCRM\s*\((\d+)\)': r'Crime (\1)',
@@ -774,6 +781,15 @@ CANON_SYNONYMS = {
     # ADVC / Assistant Divisional Commander
     r'\bADVC\b': 'Assistant Divisional Commander',
     
+    # ASSUC / Administration Sub-unit Commander
+    r'\bASSUC\b': 'Administration Sub-unit Commander',
+    
+    # MESUC / Miscellaneous Enquiries Sub-unit Commander
+    r'\bMESUC\b': 'Miscellaneous Enquiries Sub-unit Commander',
+    
+    # MESU / Miscellaneous Enquiries Sub-unit
+    r'\bMESU\b': 'Miscellaneous Enquiries Sub-unit',
+    
     # OPS variants
     r'\bOPS\s*\((\d+)\)': r'Operations (\1)',
     r'\bOPS\b': 'Operations',
@@ -793,11 +809,33 @@ CANON_SYNONYMS = {
     r'\bPSU\s*(\d+)': r'Patrol Sub-unit \1',
     r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)': r'Patrol Sub-unit \1',
     
-    # SDS variants
+    # SDS / DSDS variants
+    r'\bDSDS\s*(\d+)': r'District Special Duties Squad \1',
     r'\bD?SDS\s*(\d+)': r'Special Duties Squad \1',
     
     # TFSU
     r'\bTFSU\b': 'Task Force Sub-unit',
+    
+    # PCRO / Police Community Relations Office
+    r'\bPCRO\b': 'Police Community Relations Office',
+    
+    # ES / Efficiency Studies
+    r'^ES$': 'Efficiency Studies',
+    r'\bES\b': 'Efficiency Studies',
+    
+    # GEN / General
+    r'^GEN$': 'General',
+    r'\bGEN\b': 'General',
+    
+    # FLD / Field
+    r'^FLD$': 'Field',
+    r'\bFLD\b': 'Field',
+    
+    # Platoon/Commander variants (standardize to "Platoon N Commander")
+    r'\bPLN\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bPLATOON\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bCDR\s+PLN\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bPlatoon\s*(\d+)\s+Commander\b': r'Platoon \1 Commander',
 }
 
 ROLE_ACRONYMS = {

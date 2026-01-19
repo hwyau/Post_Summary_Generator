@@ -66,43 +66,64 @@ STARTER_ROLE_EXPANSIONS = {
 }
 
 STARTER_LOCATION_ALIASES = {
+    # Districts (normalized forms)
+    "CDIST": "CENTRAL DISTRICT",
+    "CDIV": "CENTRAL DIVISION",
+    "WDIST": "WESTERN DISTRICT",
+    "WDIV": "WESTERN DIVISION",
+    "EDIST": "EASTERN DISTRICT",
+    "MKDIST": "MONG KOK DISTRICT",
+    "NPDIST": "NORTH POINT DISTRICT",
+    "NPDIV": "NORTH POINT DIVISION",
+    "SMPDIST": "SAU MAU PING DISTRICT",
+    "TWDIST": "TSUEN WAN DISTRICT",
+    "TPDIST": "TUEN MUN DISTRICT",
+    "TPDIV": "TUEN MUN DIVISION",
+    
+    # Divisions
+    "WCH DIV": "WAN CHAI DIVISION",
+    "WCH DIST": "WAN CHAI DISTRICT",
+    "STYSDIV": "STANLEY SUB-DIVISION",
+    "ABDDIV": "ABERDEEN DIVISION",
+    
+    # Regional Command and Control
+    "RCCC HKI": "REGIONAL COMMAND AND CONTROL CENTRE HONG KONG ISLAND",
+    "HKI": "HONG KONG ISLAND REGIONAL HEADQUARTERS",
+    "RCCC NTN": "REGIONAL COMMAND AND CONTROL CENTRE NEW TERRITORIES NORTH",
+    "KW": "KOWLOON WEST REGIONAL HEADQUARTERS",
+    "CRM KW": "CRIME KOWLOON WEST REGIONAL HEADQUARTERS",
+    
+    # Emergency and Tactical Units
+    "EU NTN": "EMERGENCY UNIT NEW TERRITORIES NORTH",
+    "PTU": "POLICE TACTICAL UNIT",
+    "PTU A": "POLICE TACTICAL UNIT (A COMPANY)",
+    
+    # Bureaus and Branches
     "CCB": "COMMERCIAL CRIME BUREAU",
     "C DIV CCB": "COMMERCIAL CRIME BUREAU",
     "C DIVISION COMMERCIAL CRIME BUREAU": "COMMERCIAL CRIME BUREAU",
     "CPB": "CRIME PREVENTION BUREAU",
     "PPRB": "POLICE PUBLIC RELATIONS BRANCH",
-    "RCCC HKI": "REGIONAL COMMAND AND CONTROL CENTRE HONG KONG ISLAND",
-    "HKI": "HONG KONG ISLAND REGIONAL HEADQUARTERS",
-    "OPS": "OPERATIONS WING",
-    "PTU": "POLICE TACTICAL UNIT",
-    "CDIST": "CENTRAL DISTRICT",
-    "WDIST": "WESTERN DISTRICT",
-    "EDIST": "EASTERN DISTRICT",
-    "WCH DIV": "WAN CHAI DIVISION",
-    "WCH DIST": "WAN CHAI DISTRICT",
-    "CDIV": "CENTRAL DIVISION",
-    "WDIV": "WESTERN DIVISION",
-    "NPDIV": "NORTH POINT DIVISION",
-    "STYSDIV": "STANLEY SUB-DIVISION",
-    "ABDDIV": "ABERDEEN DIVISION",
-    "PTU A": "POLICE TACTICAL UNIT (A COMPANY)",
-    "PTS": "POLICE TRAINING SCHOOL",
+    
+    # Police Offices
     "CAPO": "COMPLAINTS AGAINST POLICE OFFICE",
     "CAPO HKI": "COMPLAINTS AGAINST POLICE OFFICE HONG KONG ISLAND",
+    
+    # Training and Support
+    "PTS": "POLICE TRAINING SCHOOL",
+    "PC TRG": "POLICE CONSTABLE TRAINING DIVISION",
+    "IST": "IN-SERVICE TRAINING",
+    "TRVE SUP": "TRAINING RESERVE SUPPORT WING",
+    
+    # Wings and Headquarters
     "SQ": "SERVICE QUALITY WING",
     "SUPPORT": "SUPPORT WING",
-    "IST": "IN-SERVICE TRAINING",
-    "PC TRG": "POLICE CONSTABLE TRAINING DIVISION",
-    "TRVE SUP": "TRAINING RESERVE SUPPORT WING",
+    "OPS": "OPERATIONS WING",
+    "HQCCC": "HEADQUARTERS COMMAND AND CONTROL CENTRE",
+    
+    # Intelligence and Anti-Triad Units
     "RATU KW": "REGIONAL ANTI TRIAD UNIT KOWLOON WEST",
     "RIU KW": "REGIONAL INTELLIGENCE UNIT KOWLOON WEST",
-    "RCCC NTN": "REGIONAL COMMAND AND CONTROL CENTRE NEW TERRITORIES NORTH",
-    "EU NTN": "EMERGENCY UNIT NEW TERRITORIES NORTH",
-    "KW": "KOWLOON WEST REGIONAL HEADQUARTERS",
-    "CRM KW": "CRIME KOWLOON WEST REGIONAL HEADQUARTERS",
-    "SMPDIST": "SAU MAU PING DISTRICT",
-    "TWDIST": "TSUEN WAN DISTRICT",
-    "MKDIST": "MONG KOK DISTRICT",
 }
 
 # ========= CORE PROCESSING FUNCTIONS =========
@@ -231,6 +252,13 @@ def is_rank_text(text: str) -> bool:
 
 # Enhanced canonicalization with comprehensive synonym rules
 CANON_SYNONYMS = {
+    # RI / Research and Inspections (multiple variants)
+    r'^RI$': 'Research and Inspections',
+    r'\bRI\b': 'Research and Inspections',
+    r'\bR\s*&\s*I\b': 'Research and Inspections',
+    r'\bR\s*and\s+I\b': 'Research and Inspections',
+    r'\bResearch\s+&\s+Inspections\b': 'Research and Inspections',
+    
     # CRM / Crime
     r'^CRM$': 'Crime',
     r'\bCRM\s*\((\d+)\)': r'Crime (\1)',
@@ -253,6 +281,15 @@ CANON_SYNONYMS = {
     # ADVC / Assistant Divisional Commander
     r'\bADVC\b': 'Assistant Divisional Commander',
     
+    # ASSUC / Administration Sub-unit Commander
+    r'\bASSUC\b': 'Administration Sub-unit Commander',
+    
+    # MESUC / Miscellaneous Enquiries Sub-unit Commander
+    r'\bMESUC\b': 'Miscellaneous Enquiries Sub-unit Commander',
+    
+    # MESU / Miscellaneous Enquiries Sub-unit
+    r'\bMESU\b': 'Miscellaneous Enquiries Sub-unit',
+    
     # OPS variants
     r'\bOPS\s*\((\d+)\)': r'Operations (\1)',
     r'\bOPS\b': 'Operations',
@@ -272,11 +309,33 @@ CANON_SYNONYMS = {
     r'\bPSU\s*(\d+)': r'Patrol Sub-unit \1',
     r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)': r'Patrol Sub-unit \1',
     
-    # SDS variants
+    # SDS / DSDS variants
+    r'\bDSDS\s*(\d+)': r'District Special Duties Squad \1',
     r'\bD?SDS\s*(\d+)': r'Special Duties Squad \1',
     
     # TFSU
     r'\bTFSU\b': 'Task Force Sub-unit',
+    
+    # PCRO / Police Community Relations Office
+    r'\bPCRO\b': 'Police Community Relations Office',
+    
+    # ES / Efficiency Studies
+    r'^ES$': 'Efficiency Studies',
+    r'\bES\b': 'Efficiency Studies',
+    
+    # GEN / General
+    r'^GEN$': 'General',
+    r'\bGEN\b': 'General',
+    
+    # FLD / Field
+    r'^FLD$': 'Field',
+    r'\bFLD\b': 'Field',
+    
+    # Platoon/Commander variants (standardize to "Platoon N Commander")
+    r'\bPLN\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bPLATOON\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bCDR\s+PLN\s*(\d+)\b': r'Platoon \1 Commander',
+    r'\bPlatoon\s*(\d+)\s+Commander\b': r'Platoon \1 Commander',
 }
 
 ROLE_ACRONYMS = {
@@ -711,24 +770,24 @@ def generate_word_document(enhanced_ranges):
     """Generate Word document with a table format."""
     doc = Document()
     
-    # Rank expansion mapping (without "of Police")
+    # Rank expansion mapping with full, official rank names
     rank_full_names = {
         'PC': 'Police Constable',
         'SPC': 'Senior Police Constable',
         'SGT': 'Sergeant',
         'SSGT': 'Station Sergeant',
-        'PI': 'Probationary Inspector',
-        'IP': 'Inspector',
-        'SIP': 'Senior Inspector',
-        'IP/SIP': 'Inspector / Senior Inspector',
-        'CIP': 'Chief Inspector',
-        'SP': 'Superintendent',
-        'SSP': 'Senior Superintendent',
-        'CSP': 'Chief Superintendent',
-        'ACP': 'Assistant Commissioner',
-        'SACP': 'Senior Assistant Commissioner',
-        'DCP': 'Deputy Commissioner',
-        'CP': 'Commissioner',
+        'PI': 'Probationary Inspector of Police',
+        'IP': 'Inspector of Police',
+        'SIP': 'Senior Inspector of Police',
+        'IP/SIP': 'Inspector of Police / Senior Inspector of Police',
+        'CIP': 'Chief Inspector of Police',
+        'SP': 'Superintendent of Police',
+        'SSP': 'Senior Superintendent of Police',
+        'CSP': 'Chief Superintendent of Police',
+        'ACP': 'Assistant Commissioner of Police',
+        'SACP': 'Senior Assistant Commissioner of Police',
+        'DCP': 'Deputy Commissioner of Police',
+        'CP': 'Commissioner of Police',
     }
     
     # Helper function to shade cell
