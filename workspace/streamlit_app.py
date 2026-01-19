@@ -259,10 +259,24 @@ CANON_SYNONYMS = {
     r'\bR\s*and\s+I\b': 'Research and Inspections',
     r'\bResearch\s+&\s+Inspections\b': 'Research and Inspections',
     
+    # Inspection / INP / Inspection variants
+    r'^INP(?:\s+2)?$': 'Inspection',
+    r'\bINP\b': 'Inspection',
+    r'\bInspection\s*\d+': 'Inspection',
+    
     # CRM / Crime
     r'^CRM$': 'Crime',
-    r'\bCRM\s*\((\d+)\)': r'Crime (\1)',
+    r'\bCRM\s*\((\d+)\)': r'Crime',
     r'\bCRM\b': 'Crime',
+    
+    # CS&INT / Counterfeit Support and Intelligence (multiple variants)
+    r'^CS\s*&\s*INT$': 'Counterfeit, Support and Intelligence',
+    r'\bCS\s*&\s*INT\b': 'Counterfeit, Support and Intelligence',
+    r'\bCounterfeit\s*,?\s*Support\s+and\s+Intelligence\b': 'Counterfeit, Support and Intelligence',
+    
+    # RPC TRG / Recruit Police Constable Training
+    r'\bRPC\s+TRG\s*\(INTAKE\)': 'Recruit Police Constable Training',
+    r'\bRPC\s+TRG\b': 'Recruit Police Constable Training',
     
     # Administration variants
     r'^ADM$': 'Administration',
@@ -287,11 +301,12 @@ CANON_SYNONYMS = {
     # MESUC / Miscellaneous Enquiries Sub-unit Commander
     r'\bMESUC\b': 'Miscellaneous Enquiries Sub-unit Commander',
     
-    # MESU / Miscellaneous Enquiries Sub-unit
+    # MESU / Miscellaneous Enquiries Sub-unit (including PSUC variant)
     r'\bMESU\b': 'Miscellaneous Enquiries Sub-unit',
+    r'\bPSUC\b': 'Patrol Sub-unit Commander',
     
     # OPS variants
-    r'\bOPS\s*\((\d+)\)': r'Operations (\1)',
+    r'\bOPS\s*\((\d+)\)': r'Operations',
     r'\bOPS\b': 'Operations',
     
     # HQCCC variants (unify all to one canonical form)
@@ -301,17 +316,17 @@ CANON_SYNONYMS = {
     r'\bHQCCC\b': 'Headquarters Command and Control Centre',
     
     # DVIT / DIVT variants
-    r'\bDIVT\s*(\d+)': r'Divisional Investigation Team \1',
-    r'\bDVIT\s*(\d+)': r'Divisional Investigation Team \1',
-    r'\bDivisional\s+Investigation\s+Team\s*(\d+)': r'Divisional Investigation Team \1',
+    r'\bDIVT\s*(\d+)': r'Divisional Investigation Team',
+    r'\bDVIT\s*(\d+)': r'Divisional Investigation Team',
+    r'\bDivisional\s+Investigation\s+Team\s*(\d+)': r'Divisional Investigation Team',
     
     # PSU variants
-    r'\bPSU\s*(\d+)': r'Patrol Sub-unit \1',
-    r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)': r'Patrol Sub-unit \1',
+    r'\bPSU\s*(\d+)': r'Patrol Sub-unit',
+    r'\bPatrol\s+Sub[-\s]?unit\s*(\d+)': r'Patrol Sub-unit',
     
     # SDS / DSDS variants
-    r'\bDSDS\s*(\d+)': r'District Special Duties Squad \1',
-    r'\bD?SDS\s*(\d+)': r'Special Duties Squad \1',
+    r'\bDSDS\s*(\d+)': r'District Special Duties Squad',
+    r'\bD?SDS\s*(\d+)': r'Special Duties Squad',
     
     # TFSU
     r'\bTFSU\b': 'Task Force Sub-unit',
@@ -331,16 +346,33 @@ CANON_SYNONYMS = {
     r'^FLD$': 'Field',
     r'\bFLD\b': 'Field',
     
-    # Platoon/Commander variants (standardize to "Platoon N Commander")
-    r'\bPLN\s*(\d+)\b': r'Platoon \1 Commander',
-    r'\bPLATOON\s*(\d+)\b': r'Platoon \1 Commander',
-    r'\bCDR\s+PLN\s*(\d+)\b': r'Platoon \1 Commander',
-    r'\bPlatoon\s*(\d+)\s+Commander\b': r'Platoon \1 Commander',
+    # DDC / Deputy District Commander
+    r'^DDC$': 'Deputy District Commander',
+    r'\bDDC\b': 'Deputy District Commander',
+    
+    # DC / District Commander (but not when part of another word)
+    r'^DC$': 'District Commander',
+    r'\bDC\b(?!\w)': 'District Commander',
+    
+    # Platoon/Commander variants (standardize, strip numbers)
+    r'\bPLN\s*(\d+)\b': 'Platoon Commander',
+    r'\bPLATOON\s*(\d+)\b': 'Platoon Commander',
+    r'\bCDR\s+PLN\s*(\d+)\b': 'Platoon Commander',
+    r'\bCDR\b': 'Commander',
+    r'\bPlatoon\s*(\d+)\s+Commander\b': 'Platoon Commander',
+    
+    # Symposium
+    r'^SYMPOSIUM$': 'Symposium',
+    r'\bSYMPOSIUM\b': 'Symposium',
+    
+    # Team variants (strip numbers)
+    r'\bTEAM\s*\d+[A-Z]?\b': 'Team',
+    r'\bTeam\s*\d+[A-Z]?\b': 'Team',
 }
 
 ROLE_ACRONYMS = {
     "HQCCC", "PTU", "EU", "RCCC", "CCB", "CAPO", "PCRO", "PPRB", 
-    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS"
+    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS", "CS"
 }
 
 def smart_title_case_role(text: str) -> str:
@@ -400,6 +432,9 @@ def clean_and_canonicalize_role(raw_role: str) -> str:
     
     # Apply title casing (preserves acronyms)
     s = smart_title_case_role(s)
+    
+    # Remove repetitive words like "Commander Commander" or "Cdr Cdr"
+    s = re.sub(r'\b(\w+)\s+\1(\s+\1)*\b', r'\1', s, flags=re.IGNORECASE)
     
     # Generic letter/number squeeze: "Xyz9" → "Xyz 9"
     s = re.sub(r'([A-Za-z]+)(\d+)', r'\1 \2', s)
