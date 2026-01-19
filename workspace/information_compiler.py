@@ -1001,17 +1001,23 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
     table = doc.add_table(rows=1, cols=3)
     table.style = 'Light Grid Accent 1'
     
+    # Set column widths (narrow for Year Range and Rank, wide for Posting Info)
+    table.columns[0].width = Inches(1.0)  # Year Range - narrow
+    table.columns[1].width = Inches(1.2)  # Rank - narrow
+    table.columns[2].width = Inches(4.3)  # Posting Location & Roles - wide
+    
     # Add header row
     header_cells = table.rows[0].cells
     header_cells[0].text = "Year Range"
     header_cells[1].text = "Rank"
     header_cells[2].text = "Posting Location & Roles"
     
-    # Make header bold
+    # Format header row - bold and size 13
     for cell in header_cells:
         for paragraph in cell.paragraphs:
             for run in paragraph.runs:
                 run.bold = True
+                run.font.size = Pt(13)
     
     # Add data rows
     for item in enhanced_ranges:
@@ -1039,6 +1045,12 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
         row_cells[0].text = year_range
         row_cells[1].text = rank
         row_cells[2].text = posting_text
+        
+        # Set font size 13 for all cells
+        for cell in row_cells:
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.size = Pt(13)
     
     # Save document
     doc.save(output_filename)
