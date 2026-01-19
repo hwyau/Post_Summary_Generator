@@ -997,6 +997,26 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
     """
     doc = Document()
     
+    # Rank expansion mapping
+    rank_full_names = {
+        'PC': 'Police Constable',
+        'SPC': 'Senior Police Constable',
+        'SGT': 'Sergeant',
+        'SSGT': 'Station Sergeant',
+        'PI': 'Probationary Inspector of Police',
+        'IP': 'Inspector of Police',
+        'SIP': 'Senior Inspector of Police',
+        'IP/SIP': 'Inspector of Police / Senior Inspector of Police',
+        'CIP': 'Chief Inspector of Police',
+        'SP': 'Superintendent of Police',
+        'SSP': 'Senior Superintendent of Police',
+        'CSP': 'Chief Superintendent of Police',
+        'ACP': 'Assistant Commissioner of Police',
+        'SACP': 'Senior Assistant Commissioner of Police',
+        'DCP': 'Deputy Commissioner of Police',
+        'CP': 'Commissioner of Police',
+    }
+    
     # Create table with 3 columns
     table = doc.add_table(rows=1, cols=3)
     table.style = 'Light Grid Accent 1'
@@ -1026,6 +1046,9 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
         locations = item['locations']
         roles_by_location = item['roles_by_location']
         
+        # Convert rank acronym to full name
+        rank_display = rank_full_names.get(rank, rank)
+        
         # Build posting info text
         posting_info = []
         if locations:
@@ -1043,7 +1066,7 @@ def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summar
         # Add row
         row_cells = table.add_row().cells
         row_cells[0].text = year_range
-        row_cells[1].text = rank
+        row_cells[1].text = rank_display
         row_cells[2].text = posting_text
         
         # Set font size 13 for all cells
