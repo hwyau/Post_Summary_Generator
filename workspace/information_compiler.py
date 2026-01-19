@@ -992,58 +992,53 @@ save_vocab(vocab)
 # ========= STEP 13: GENERATE WORD DOCUMENT =========
 def generate_word_document(enhanced_ranges, output_filename="HKPF_Posting_Summary.docx"):
     """
-    Generate a professional Word document from the enhanced ranges data.
+    Generate a Word document with a table format.
+    Table columns: Year Range | Rank | Posting Location & Roles
     """
     doc = Document()
     
-    # Add title
-    title = doc.add_heading("HKPF Posting Summary", 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Create table with 3 columns
+    table = doc.add_table(rows=1, cols=3)
+    table.style = 'Light Grid Accent 1'
     
-    # Add metadata
-    metadata = doc.add_paragraph()
-    metadata.add_run("Generated: ").bold = True
-    metadata.add_run(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    metadata.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Add header row
+    header_cells = table.rows[0].cells
+    header_cells[0].text = "Year Range"
+    header_cells[1].text = "Rank"
+    header_cells[2].text = "Posting Location & Roles"
     
-    doc.add_paragraph()  # spacing
+    # Make header bold
+    for cell in header_cells:
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                run.bold = True
     
-    # Add summary statistics
-    doc.add_heading("Summary", level=1)
-    summary_para = doc.add_paragraph()
-    summary_para.add_run(f"Total Rank Periods: ").bold = True
-    summary_para.add_run(str(len(enhanced_ranges)))
-    
-    # Process each rank period
+    # Add data rows
     for item in enhanced_ranges:
-        rank = item['true_rank']
         year_range = item['year_range']
+        rank = item['true_rank']
         locations = item['locations']
         roles_by_location = item['roles_by_location']
         
-        # Add rank heading
-        doc.add_heading(f"{rank}: {year_range}", level=2)
+        # Build posting info text
+        posting_info = []
+        if locations:
+            for loc in locations:
+                posting_info.append(f"{loc}")
+                roles = roles_by_location.get(loc, [])
+                if roles:
+                    for role in roles:
+                        posting_info.append(f"  • {role}")
+        else:
+            posting_info.append("(No locations recorded)")
         
-        # Add locations and roles
-        if not locations:
-            doc.add_paragraph("(No locations recorded)")
-            continue
-            
-        for loc in locations:
-            # Add location as subheading
-            loc_para = doc.add_paragraph(loc, style='List Bullet')
-            loc_para.paragraph_format.left_indent = Inches(0.25)
-            
-            # Add roles for this location
-            roles = roles_by_location.get(loc, [])
-            if roles:
-                for role in roles:
-                    role_para = doc.add_paragraph(role, style='List Bullet 2')
-                    role_para.paragraph_format.left_indent = Inches(0.5)
-            else:
-                doc.add_paragraph("(No specific roles recorded)", style='List Bullet 2')
+        posting_text = "\n".join(posting_info)
         
-        doc.add_paragraph()  # spacing between rank periods
+        # Add row
+        row_cells = table.add_row().cells
+        row_cells[0].text = year_range
+        row_cells[1].text = rank
+        row_cells[2].text = posting_text
     
     # Save document
     doc.save(output_filename)
