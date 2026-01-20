@@ -965,23 +965,16 @@ def process_excel_file(uploaded_file):
                 roles = roles_by_loc[loc_name]
                 # Canonicalize all roles again to ensure all variants are expanded
                 canonical_roles = [clean_and_canonicalize_role(r) for r in roles]
-                # Deduplicate after canonicalization
-                unique_roles = []
-                seen = set()
+                # Strict normalization: keep only the longest (most complete) unique role for each normalized key
+                norm_map = {}
                 for r in canonical_roles:
                     key = re.sub(r'[^a-z0-9]', '', r.casefold())
-                    if key not in seen and r:
-                        seen.add(key)
-                        unique_roles.append(r)
-                # Group-level deduplication: if both a full form and abbreviation exist, only keep the full form
-                to_remove = set()
-                for i, role1 in enumerate(unique_roles):
-                    for j, role2 in enumerate(unique_roles):
-                        if i == j:
-                            continue
-                        if is_abbreviation_of(role1, role2):
-                            to_remove.add(i)
-                roles_by_loc[loc_name] = [r for i, r in enumerate(unique_roles) if i not in to_remove]
+                    if not key:
+                        continue
+                    # Always keep the longest version for each key
+                    if key not in norm_map or len(r) > len(norm_map[key]):
+                        norm_map[key] = r
+                roles_by_loc[loc_name] = list(norm_map.values())
             
             # Rebuild unique locations list without Divisions
             final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
