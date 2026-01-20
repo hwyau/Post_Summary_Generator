@@ -65,6 +65,7 @@ STARTER_ROLE_EXPANSIONS = {
     "PCRO": "Police Community Relations Office",
 }
 
+
 STARTER_LOCATION_ALIASES = {
     # Districts (normalized forms) - VERIFIED
     "CDIST": "CENTRAL DISTRICT",
@@ -452,7 +453,7 @@ CANON_SYNONYMS = {
 
 ROLE_ACRONYMS = {
     "HQCCC", "PTU", "EU", "RCCC", "CCB", "CAPO", "PCRO", "PPRB", 
-    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "RI", "ES", "OPS", "CS"
+    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS", "CS"
 }
 
 def smart_title_case_role(text: str) -> str:
