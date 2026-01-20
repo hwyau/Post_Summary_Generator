@@ -969,18 +969,27 @@ def process_excel_file(uploaded_file):
             # Clean up all roles: standardize Room/Rm, remove numbered variants, deduplicate
             for loc_name in roles_by_loc:
                 roles = roles_by_loc[loc_name]
+                # First, clean up variants and deduplicate
                 cleaned_roles = []
                 seen = set()
                 for role in roles:
-                    # Apply variant cleanup (Room/Rm standardization, remove numbers)
                     cleaned = cleanup_role_variants(role)
                     if cleaned:
-                        # Deduplicate after cleanup
                         key = cleaned.casefold()
                         if key not in seen:
                             seen.add(key)
                             cleaned_roles.append(cleaned)
-                roles_by_loc[loc_name] = cleaned_roles
+
+                # Now, remove abbreviations if full form exists in the same location
+                to_remove = set()
+                for i, role1 in enumerate(cleaned_roles):
+                    for j, role2 in enumerate(cleaned_roles):
+                        if i == j:
+                            continue
+                        # Remove role1 if it is an abbreviation of role2
+                        if is_abbreviation_of(role1, role2):
+                            to_remove.add(i)
+                roles_by_loc[loc_name] = [r for i, r in enumerate(cleaned_roles) if i not in to_remove]
             
             # Rebuild unique locations list without Divisions
             final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
