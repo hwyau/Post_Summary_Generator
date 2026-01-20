@@ -973,17 +973,13 @@ def process_excel_file(uploaded_file):
                     if key not in seen and r:
                         seen.add(key)
                         unique_roles.append(r)
-                # Fuzzy deduplication: remove any role that is a substring, abbreviation, or fuzzy match of a longer role in the same list
+                # Group-level deduplication: if both a full form and abbreviation exist, only keep the full form
                 to_remove = set()
-                def norm(s):
-                    return re.sub(r'[^a-z0-9]', '', s.casefold())
                 for i, role1 in enumerate(unique_roles):
                     for j, role2 in enumerate(unique_roles):
                         if i == j:
                             continue
-                        n1, n2 = norm(role1), norm(role2)
-                        # Remove role1 if it is a substring or abbreviation of role2
-                        if n1 != n2 and (n1 in n2 or is_abbreviation_of(role1, role2)):
+                        if is_abbreviation_of(role1, role2):
                             to_remove.add(i)
                 roles_by_loc[loc_name] = [r for i, r in enumerate(unique_roles) if i not in to_remove]
             
