@@ -435,6 +435,15 @@ CANON_SYNONYMS = {
     r'\bPUB\b': 'Publicity',
     r'^SA$': 'Security Advisory Section',
     r'\bSA\b': 'Security Advisory Section',
+    
+    # Strip trailing numbers from all role names (Squad 1 → Squad, Team 2 → Team, etc.)
+    r'Special Duties Squad\s+\d+': 'Special Duties Squad',
+    r'District Special Duties Squad\s+\d+': 'District Special Duties Squad',
+    r'Divisional Investigation Team\s+\d+': 'Divisional Investigation Team',
+    r'Patrol Sub-unit\s+\d+': 'Patrol Sub-unit',
+    r'Platoon\s+\d+': 'Platoon',
+    r'Operations\s+\d+': 'Operations',
+    r'(\w+\s+)*(\w+)\s+\d+$': r'\2',  # Catch-all: remove trailing numbers from any role
 }
 
 ROLE_ACRONYMS = {
