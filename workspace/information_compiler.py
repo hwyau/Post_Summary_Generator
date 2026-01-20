@@ -823,17 +823,14 @@ CANON_SYNONYMS = {
     r'\bR\s*and\s+I\b': 'Research and Inspections',
     r'\bResearch\s+&\s+Inspections\b': 'Research and Inspections',
     
-    # T / Traffic (unit/department acronym)
-    r'^T$': 'Traffic',
-    r'\bT\b': 'Traffic',
-    
-    # T NTN / Traffic New Territories North
+    # T NTN / Traffic New Territories North (check these FIRST before generic T)
     r'^T\s+NTN$': 'Traffic New Territories North',
-    r'\bT\s+NTN\b': 'Traffic New Territories North',
-    
-    # T NTS / Traffic New Territories South
     r'^T\s+NTS$': 'Traffic New Territories South',
-    r'\bT\s+NTS\b': 'Traffic New Territories South',
+    
+    # T / Traffic (unit/department acronym - only standalone T)
+    r'^T$': 'Traffic',
+    r'^T\s': 'Traffic',
+    r'\sT$': 'Traffic',
     
     # Inspection / INP / Inspection variants
     r'^INP(?:\s+2)?$': 'Inspection',

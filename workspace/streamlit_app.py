@@ -313,7 +313,12 @@ CANON_SYNONYMS = {
     
     # T / Traffic (unit/department acronym)
     r'^T$': 'Traffic',
-    r'\bT\b': 'Traffic',
+    r'^T\s': 'Traffic',
+    r'\sT$': 'Traffic',
+    
+    # T NTN / Traffic New Territories North
+    r'^T\s+NTN$': 'Traffic New Territories North',
+    r'^T\s+NTS$': 'Traffic New Territories South',
     
     # Inspection / INP / Inspection variants
     r'^INP(?:\s+2)?$': 'Inspection',
