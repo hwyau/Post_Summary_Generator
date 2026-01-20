@@ -827,6 +827,14 @@ CANON_SYNONYMS = {
     r'^T$': 'Traffic',
     r'\bT\b': 'Traffic',
     
+    # T NTN / Traffic New Territories North
+    r'^T\s+NTN$': 'Traffic New Territories North',
+    r'\bT\s+NTN\b': 'Traffic New Territories North',
+    
+    # T NTS / Traffic New Territories South
+    r'^T\s+NTS$': 'Traffic New Territories South',
+    r'\bT\s+NTS\b': 'Traffic New Territories South',
+    
     # Inspection / INP / Inspection variants
     r'^INP(?:\s+2)?$': 'Inspection',
     r'\bINP\b': 'Inspection',
@@ -913,6 +921,10 @@ CANON_SYNONYMS = {
     # FLD / Field
     r'^FLD$': 'Field',
     r'\bFLD\b': 'Field',
+    
+    # PTU / Police Tactical Unit (all variants: A, W, W COY, etc.)
+    r'^PTU\b.*': 'Police Tactical Unit',
+    r'\bPTU\b.*': 'Police Tactical Unit',
     
     # DDC / Deputy District Commander
     r'^DDC$': 'Deputy District Commander',
