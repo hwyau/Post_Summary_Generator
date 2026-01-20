@@ -511,19 +511,19 @@ def extract_location_codes_from_row(r, loc_alias):
     Search ALL columns in a row for known location codes.
     Returns the first location code found and its expanded form.
     """
-    location_codes = {k: v for k, v in loc_alias.items() if len(k) <= 5}  # Focus on short codes
-    
     # Scan all values in the row
     for col_value in r.values:
         if not col_value:
             continue
         text = str(col_value).upper().strip()
         
-        # Look for location codes as whole words/tokens
-        for code in location_codes:
-            if code.upper() in text:
+        # Look for location codes - prioritize longer codes first to avoid partial matches
+        for code in sorted(loc_alias.keys(), key=len, reverse=True):
+            code_upper = code.upper()
+            # Check if code appears as a whole token (with word boundaries)
+            if code_upper == text or re.search(r'\b' + re.escape(code_upper) + r'\b', text):
                 # Found a location code
-                return location_codes[code.upper()]
+                return loc_alias[code]
     
     return ""
 
