@@ -553,44 +553,56 @@ def cleanup_role_variants(role):
 
 def extract_roles_from_row(r):
     """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
-    roles_out = []
     
-    # Collect all raw role candidates
+    # Collect all raw role candidates with their source and length
     candidates = []
     
-    # 1) Designation Description (often the full form)
+    # 1) Designation Description (priority 1 - usually full form)
     dd_raw = r.get('designation_desc') or ''
     if dd_raw and not is_rank_text(dd_raw):
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
-            candidates.append((dd, len(str(dd_raw))))  # Store with original length for comparison
+            candidates.append(('designation_desc', dd, len(str(dd_raw))))
     
-    # 2) Designation (often abbreviated)
+    # 2) Designation (priority 2 - often abbreviated)
     d_raw = r.get('designation') or ''
     if d_raw and not is_rank_text(d_raw):
         d = clean_and_canonicalize_role(d_raw)
         if d:
-            candidates.append((d, len(str(d_raw))))
+            candidates.append(('designation', d, len(str(d_raw))))
     
-    # 3) Post Type only if non-rank
+    # 3) Post Type (priority 3)
     pt_raw = r.get('post_type') or ''
     if pt_raw and not is_rank_text(pt_raw):
         p = clean_and_canonicalize_role(pt_raw)
         if p:
-            candidates.append((p, len(str(pt_raw))))
+            candidates.append(('post_type', p, len(str(pt_raw))))
     
-    # Deduplicate & prefer longer forms (full names over abbreviations)
-    seen = {}  # Maps canonical form to (role, length)
-    for role, orig_len in candidates:
+    # Deduplicate & prefer:
+    # 1) Roles from "designation_desc" (usually full form)
+    # 2) Then longer versions of the same role
+    seen = {}  # Maps canonical form to (source, role, length)
+    for source, role, orig_len in candidates:
         if not role or role.lower() in {"nan", "none", "null"}:
             continue
         key = role.casefold()
-        # Keep the longer version if we've seen this role before
-        if key not in seen or orig_len > seen[key][1]:
-            seen[key] = (role, orig_len)
+        
+        # If we haven't seen this role, add it
+        if key not in seen:
+            seen[key] = (source, role, orig_len)
+        else:
+            # Replace if new source is better (designation_desc > designation > post_type)
+            source_priority = {'designation_desc': 0, 'designation': 1, 'post_type': 2}
+            curr_source, curr_role, curr_len = seen[key]
+            new_priority = source_priority.get(source, 3)
+            curr_priority = source_priority.get(curr_source, 3)
+            
+            # Replace if new source has higher priority or same priority but longer
+            if new_priority < curr_priority or (new_priority == curr_priority and orig_len > curr_len):
+                seen[key] = (source, role, orig_len)
     
-    # Extract just the roles (drop length info)
-    return [role for role, _ in seen.values()]
+    # Extract just the roles
+    return [role for _, role, _ in seen.values()]
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
