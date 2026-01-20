@@ -427,6 +427,14 @@ CANON_SYNONYMS = {
     # Team variants (strip numbers)
     r'\bTEAM\s*\d+[A-Z]?\b': 'Team',
     r'\bTeam\s*\d+[A-Z]?\b': 'Team',
+    
+    # Common abbreviations that appear in role data
+    r'^ACH\s*LIA$': 'Architectural Liaison',
+    r'\bACH\s*LIA\b': 'Architectural Liaison',
+    r'^PUB$': 'Publicity',
+    r'\bPUB\b': 'Publicity',
+    r'^SA$': 'Security Advisory Section',
+    r'\bSA\b': 'Security Advisory Section',
 }
 
 ROLE_ACRONYMS = {
