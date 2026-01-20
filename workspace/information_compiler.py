@@ -421,9 +421,25 @@ for col in ['date_start', 'date_end']:
         df[col] = pd.to_datetime(df[col], errors='coerce')
 
 # Ensure presence of text columns
+
+# Ensure presence of text columns
 for col in ['post_type', 'post_type_desc', 'designation', 'designation_desc', 'location', 'location_desc']:
     if col not in df.columns:
         df[col] = ""
+
+# Force only Designation (Description) to be used, unless empty, then use Designation
+def get_final_designation(row):
+    desc = str(row.get('designation_desc', '') or '').strip()
+    if desc and desc.lower() not in {"", "nan", "none", "null", "-"}:
+        return desc
+    desig = str(row.get('designation', '') or '').strip()
+    if desig and desig.lower() not in {"", "nan", "none", "null", "-"}:
+        return desig
+    return ''
+
+df['final_designation'] = df.apply(get_final_designation, axis=1)
+df['designation'] = df['final_designation']
+df['designation_desc'] = df['final_designation']
 
 # ========= STEP 3: RANK MAPPING (IP/SIP preserved & enforced) =========
 rank_order = ['PC', 'SPC', 'SGT', 'SSGT', 'PI', 'IP', 'SIP', 'CIP', 'SP', 'SSP', 'CSP', 'ACP', 'SACP', 'DCP', 'CP']
