@@ -1233,7 +1233,20 @@ def extract_roles_from_row(r):
             # Always keep the longest version for each key
             if key not in norm_map or len(r) > len(norm_map[key]):
                 norm_map[key] = r
-        roles_by_loc[loc_name] = list(norm_map.values())
+        # Remove abbreviations if a full form exists (e.g., 'Cmu Rel' vs 'Community Relations')
+        # If two roles are similar and one is a substring of the other, keep only the longer one
+        final_roles = set(norm_map.values())
+        to_remove = set()
+        for r1 in final_roles:
+            for r2 in final_roles:
+                if r1 == r2:
+                    continue
+                # Remove r1 if it is a substring of r2 (case-insensitive, ignore spaces)
+                r1_norm = re.sub(r'\s+', '', r1).lower()
+                r2_norm = re.sub(r'\s+', '', r2).lower()
+                if r1_norm != r2_norm and r1_norm in r2_norm:
+                    to_remove.add(r1)
+        roles_by_loc[loc_name] = sorted(final_roles - to_remove)
     
     # Rebuild unique locations list without Divisions
     final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
