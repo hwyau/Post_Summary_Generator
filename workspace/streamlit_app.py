@@ -507,6 +507,27 @@ def clean_and_canonicalize_role(raw_role: str) -> str:
     
     return s
 
+def extract_location_codes_from_row(r, loc_alias):
+    """
+    Search ALL columns in a row for known location codes.
+    Returns the first location code found and its expanded form.
+    """
+    location_codes = {k: v for k, v in loc_alias.items() if len(k) <= 5}  # Focus on short codes
+    
+    # Scan all values in the row
+    for col_value in r.values:
+        if not col_value:
+            continue
+        text = str(col_value).upper().strip()
+        
+        # Look for location codes as whole words/tokens
+        for code in location_codes:
+            if code.upper() in text:
+                # Found a location code
+                return location_codes[code.upper()]
+    
+    return ""
+
 def cleanup_role_variants(role):
     """
     Clean up role by:
@@ -744,6 +765,12 @@ def process_excel_file(uploaded_file):
                 loc_desc.notna() & (loc_desc.astype(str).str.strip() != ''),
                 sub['location']
             ).apply(lambda x: normalize_location(x, STARTER_LOCATION_ALIASES))
+            
+            # Also search each row for location codes in ANY column
+            row_location_codes = sub.apply(lambda row: extract_location_codes_from_row(row, STARTER_LOCATION_ALIASES), axis=1)
+            
+            # Prioritize location codes found in row over division column
+            loc_series = loc_series.where(row_location_codes == '', row_location_codes)
             
             sub['role_list'] = sub.apply(extract_roles_from_row, axis=1)
             
