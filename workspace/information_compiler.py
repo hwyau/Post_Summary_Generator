@@ -704,7 +704,10 @@ CANON_SYNONYMS = {
 
     # Community relations
     r'\bCMU\s*REL\b': 'Community Relations',
+    r'^CMU REL$': 'Community Relations',
+    r'^C M U REL$': 'Community Relations',
     r'^COMMUNITY RELATIONS$': 'Community Relations',
+    r'^COMM REL$': 'Community Relations',
     r'\bPCRO\b': 'Police Community Relations Office',
     r'^POLICE COMMUNITY RELATIONS OFFICE$': 'Police Community Relations Office',
 

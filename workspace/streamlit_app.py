@@ -387,6 +387,12 @@ CANON_SYNONYMS = {
     r'\bTFSU\b': 'Task Force Sub-unit',
     
     # PCRO / Police Community Relations Office
+    # Community relations (force all variants to canonical form)
+    r'\bCMU\s*REL\b': 'Community Relations',
+    r'^CMU REL$': 'Community Relations',
+    r'^C M U REL$': 'Community Relations',
+    r'^COMMUNITY RELATIONS$': 'Community Relations',
+    r'^COMM REL$': 'Community Relations',
     r'\bPCRO\b': 'Police Community Relations Office',
     
     # ES / Efficiency Studies
