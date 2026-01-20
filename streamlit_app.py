@@ -405,6 +405,10 @@ CANON_SYNONYMS = {
     r'^PTU\b.*': 'Police Tactical Unit',
     r'\bPTU\b.*': 'Police Tactical Unit',
     
+    # ADC / Assistant Divisional Commander
+    r'^ADC$': 'Assistant Divisional Commander',
+    r'\bADC\b': 'Assistant Divisional Commander',
+    
     # DDC / Deputy District Commander
     r'^DDC$': 'Deputy District Commander',
     r'\bDDC\b': 'Deputy District Commander',

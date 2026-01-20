@@ -401,6 +401,10 @@ CANON_SYNONYMS = {
     r'^FLD$': 'Field',
     r'\bFLD\b': 'Field',
     
+    # ADC / Assistant Divisional Commander
+    r'^ADC$': 'Assistant Divisional Commander',
+    r'\bADC\b': 'Assistant Divisional Commander',
+    
     # DDC / Deputy District Commander
     r'^DDC$': 'Deputy District Commander',
     r'\bDDC\b': 'Deputy District Commander',
