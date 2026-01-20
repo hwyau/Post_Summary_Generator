@@ -655,40 +655,28 @@ def extract_roles_from_row(r):
     """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     
     roles_out = []
-
-    # 1) If Designation Description exists → USE ONLY THAT
     dd_raw = r.get('designation_desc') or ''
+    d_raw = r.get('designation') or ''
+
     if dd_raw and not is_rank_text(dd_raw):
+        # Only use Designation (Description) if present
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
             roles_out.append(dd)
-        # Do NOT read designation at all when desc exists
+    elif d_raw and not is_rank_text(d_raw):
+        # Only use Designation if desc is empty
+        d = clean_and_canonicalize_role(d_raw)
+        if d:
+            roles_out.append(d)
     else:
-        # 2) Otherwise fall back to Designation (try to expand if possible)
-        d_raw = r.get('designation') or ''
-        if d_raw and not is_rank_text(d_raw):
-            d = clean_and_canonicalize_role(d_raw)
-            if d:
-                roles_out.append(d)
-
-    # 3) Post Type only if non-rank AND only if designation & desc gave nothing
-    if not roles_out:
+        # Only if both are empty, fallback to post_type
         pt_raw = r.get('post_type') or ''
         if pt_raw and not is_rank_text(pt_raw):
             p = clean_and_canonicalize_role(pt_raw)
             if p:
                 roles_out.append(p)
 
-    # Final per-row dedupe
-    clean = []
-    seen = set()
-    for x in roles_out:
-        key = x.casefold()
-        if key not in seen:
-            seen.add(key)
-            clean.append(x)
-
-    return clean
+    return roles_out
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
