@@ -837,9 +837,13 @@ def process_excel_file(uploaded_file):
                 roles_to_remove = set()
                 for i, role1 in enumerate(roles_list):
                     for j, role2 in enumerate(roles_list):
-                        if i != j and is_abbreviation_of(role1, role2):
-                            roles_to_remove.add(role1)
-                # Remove abbreviations
+                        if i != j:
+                            # Check both directions - role1 could be abbrev of role2 OR vice versa
+                            if is_abbreviation_of(role1, role2):
+                                roles_to_remove.add(role1)
+                            elif is_abbreviation_of(role2, role1):
+                                roles_to_remove.add(role2)
+                # Remove abbreviations, preserving order
                 roles_by_loc[loc] = [r for r in roles_list if r not in roles_to_remove]
             
             unique_locs = []

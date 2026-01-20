@@ -481,15 +481,16 @@ def is_abbreviation_of(abbrev: str, full: str) -> bool:
     abbrev_words = abbrev.split()
     full_words = full.split()
     
-    # If abbrev has fewer words, check if each abbrev word starts with each full word
+    # If abbrev has fewer words, check if each abbrev word starts with or is in each full word
     if len(abbrev_words) == len(full_words):
-        # Check if each word in abbrev is the first letter(s) of the corresponding full word
+        # Check if each word in abbrev is the first letter(s) of the corresponding full word or appears in it
         for aw, fw in zip(abbrev_words, full_words):
-            if not fw.startswith(aw):
+            if not (fw.startswith(aw) or aw in fw):
                 return False
         return True
     
     return False
+
 
 def pick_best_designations(roles_out: list) -> list:
     """
@@ -890,9 +891,13 @@ def process_excel_file(uploaded_file):
                 roles_to_remove = set()
                 for i, role1 in enumerate(roles_list):
                     for j, role2 in enumerate(roles_list):
-                        if i != j and is_abbreviation_of(role1, role2):
-                            roles_to_remove.add(role1)
-                # Remove abbreviations
+                        if i != j:
+                            # Check both directions - role1 could be abbrev of role2 OR vice versa
+                            if is_abbreviation_of(role1, role2):
+                                roles_to_remove.add(role1)
+                            elif is_abbreviation_of(role2, role1):
+                                roles_to_remove.add(role2)
+                # Remove abbreviations, preserving order
                 roles_by_loc[loc] = [r for r in roles_list if r not in roles_to_remove]
             
             unique_locs = []
