@@ -1246,7 +1246,16 @@ def extract_roles_from_row(r):
                 r2_norm = re.sub(r'\s+', '', r2).lower()
                 if r1_norm != r2_norm and r1_norm in r2_norm:
                     to_remove.add(r1)
-        roles_by_loc[loc_name] = sorted(final_roles - to_remove)
+        deduped = [r for r in sorted(final_roles - to_remove)]
+        # Final aggressive dedup: remove any role that matches (case-insensitive, ignoring spaces) any other role already in the list
+        truly_unique = []
+        seen_norms = set()
+        for r in deduped:
+            norm = re.sub(r'\s+', '', r).lower()
+            if norm not in seen_norms:
+                truly_unique.append(r)
+                seen_norms.add(norm)
+        roles_by_loc[loc_name] = truly_unique
     
     # Rebuild unique locations list without Divisions
     final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
