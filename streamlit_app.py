@@ -18,13 +18,13 @@ st.write("Upload an Excel file to generate a professional posting summary Word d
 
 # ========= VOCAB + CONFIGURATION =========
 STARTER_ROLE_EXPANSIONS = {
-    "CSP": "Chief Superintendent of Police",
-    "SSP": "Senior Superintendent of Police",
-    "SP": "Superintendent of Police",
-    "CIP": "Chief Inspector of Police",
-    "SIP": "Senior Inspector of Police",
-    "IP": "Inspector of Police",
-    "PI": "Probationary Inspector of Police",
+    "CSP": "Chief Superintendent",
+    "SSP": "Senior Superintendent",
+    "SP": "Superintendent",
+    "CIP": "Chief Inspector",
+    "SIP": "Senior Inspector",
+    "IP": "Inspector",
+    "PI": "Probationary Inspector",
     "SSGT": "Station Sergeant",
     "SGT": "Sergeant",
     "SPC": "Senior Police Constable",

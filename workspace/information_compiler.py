@@ -162,13 +162,13 @@ UNKNOWN_PATH = Path("hkpf_unknowns.json")
 # ========= STARTER VOCAB (seeded) =========
 STARTER_ROLE_EXPANSIONS = {
     # Rank-like (for detection; not printed as roles when from Post Type)
-    "CSP": "Chief Superintendent of Police",
-    "SSP": "Senior Superintendent of Police",
-    "SP": "Superintendent of Police",
-    "CIP": "Chief Inspector of Police",
-    "SIP": "Senior Inspector of Police",
-    "IP": "Inspector of Police",
-    "PI": "Probationary Inspector of Police",
+    "CSP": "Chief Superintendent",
+    "SSP": "Senior Superintendent",
+    "SP": "Superintendent",
+    "CIP": "Chief Inspector",
+    "SIP": "Senior Inspector",
+    "IP": "Inspector",
+    "PI": "Probationary Inspector",
     "SSGT": "Station Sergeant",
     "SGT": "Sergeant",
     "SPC": "Senior Police Constable",
