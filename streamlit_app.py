@@ -551,6 +551,25 @@ def cleanup_role_variants(role):
     
     return cleaned
 
+def is_abbreviation_of(short, long):
+    """Check if short is an abbreviation of long (e.g., 'Ach Lia' for 'Architectural Liaison')."""
+    if len(short) >= len(long):
+        return False
+    short_words = short.upper().split()
+    long_words = long.upper().split()
+    if len(short_words) > len(long_words):
+        return False
+    # Check if short words match the first letters of long words or are substrings
+    for sw in short_words:
+        found = False
+        for lw in long_words:
+            if lw.startswith(sw) or sw in lw:
+                found = True
+                break
+        if not found:
+            return False
+    return True
+
 def extract_roles_from_row(r):
     """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     
@@ -811,6 +830,17 @@ def process_excel_file(uploaded_file):
                     if key not in seen_by_loc[l]:
                         roles_by_loc[l].append(role_canonical)
                         seen_by_loc[l].add(key)
+            
+            # Remove abbreviations from roles (e.g., "Ach Lia" if "Architectural Liaison" exists)
+            for loc in roles_by_loc:
+                roles_list = roles_by_loc[loc]
+                roles_to_remove = set()
+                for i, role1 in enumerate(roles_list):
+                    for j, role2 in enumerate(roles_list):
+                        if i != j and is_abbreviation_of(role1, role2):
+                            roles_to_remove.add(role1)
+                # Remove abbreviations
+                roles_by_loc[loc] = [r for r in roles_list if r not in roles_to_remove]
             
             unique_locs = []
             seen_locs = set()
