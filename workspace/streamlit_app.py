@@ -448,7 +448,7 @@ CANON_SYNONYMS = {
 
 ROLE_ACRONYMS = {
     "HQCCC", "PTU", "EU", "RCCC", "CCB", "CAPO", "PCRO", "PPRB", 
-    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS", "CS"
+    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "RI", "ES", "OPS", "CS"
 }
 
 def smart_title_case_role(text: str) -> str:
