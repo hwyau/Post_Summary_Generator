@@ -1092,7 +1092,7 @@ for seg in year_ranges:
     ).apply(normalize_location)
 
     # Extract roles per row
-    def extract_roles_from_row(r):
+def extract_roles_from_row(r):
     roles_out = []
 
     # 1) If Designation Description exists → USE ONLY THAT
@@ -1282,9 +1282,9 @@ for item in enhanced_ranges:
 
 print("\nTotal rows of data:", len(data_arrays))
 if len(data_arrays) > 0:
-    print("Example: data0 =", data0)
-if len(data_arrays) > 1:
-    print("Example: data1 =", data1)
+        # print("Example: data0 =", data0)
+    pass
+    pass
 
 # ========= STEP 12: Unknowns export + save vocab =========
 if EXPORT_UNKNOWNS:
@@ -1295,6 +1295,7 @@ if EXPORT_UNKNOWNS:
     with open(UNKNOWN_PATH, "w", encoding="utf-8") as f:
         json.dump(unknown_payload, f, ensure_ascii=False, indent=2)
     print(f"\n[Info] Exported unknown tokens to {UNKNOWN_PATH.resolve()}")
+    pass
 
 save_vocab(vocab)
 # ========= STEP 13: GENERATE WORD DOCUMENT =========
