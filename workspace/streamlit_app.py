@@ -448,7 +448,7 @@ CANON_SYNONYMS = {
 
 ROLE_ACRONYMS = {
     "HQCCC", "PTU", "EU", "RCCC", "CCB", "CAPO", "PCRO", "PPRB", 
-    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "RI", "ES", "OPS", "CS"
+    "DVIT", "PSU", "SDS", "DSDS", "RIU", "RATU", "ADC", "DDC", "DC", "RI", "ES", "OPS", "CS"
 }
 
 def smart_title_case_role(text: str) -> str:
@@ -648,55 +648,41 @@ def is_abbreviation_of(short, long):
 def extract_roles_from_row(r):
     """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     
-    # Collect all raw role candidates with their source and length
-    candidates = []
-    
-    # 1) Designation Description (priority 1 - usually full form)
+    roles_out = []
+
+    # 1) If Designation Description exists → USE ONLY THAT
     dd_raw = r.get('designation_desc') or ''
     if dd_raw and not is_rank_text(dd_raw):
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
-            candidates.append(('designation_desc', dd, len(str(dd_raw))))
-    
-    # 2) Designation (priority 2 - often abbreviated)
-    d_raw = r.get('designation') or ''
-    if d_raw and not is_rank_text(d_raw):
-        d = clean_and_canonicalize_role(d_raw)
-        if d:
-            candidates.append(('designation', d, len(str(d_raw))))
-    
-    # 3) Post Type (priority 3)
-    pt_raw = r.get('post_type') or ''
-    if pt_raw and not is_rank_text(pt_raw):
-        p = clean_and_canonicalize_role(pt_raw)
-        if p:
-            candidates.append(('post_type', p, len(str(pt_raw))))
-    
-    # Deduplicate & prefer:
-    # 1) Roles from "designation_desc" (usually full form)
-    # 2) Then longer versions of the same role
-    seen = {}  # Maps canonical form to (source, role, length)
-    for source, role, orig_len in candidates:
-        if not role or role.lower() in {"nan", "none", "null"}:
-            continue
-        key = role.casefold()
-        
-        # If we haven't seen this role, add it
+            roles_out.append(dd)
+        # Do NOT read designation at all when desc exists
+    else:
+        # 2) Otherwise fall back to Designation (try to expand if possible)
+        d_raw = r.get('designation') or ''
+        if d_raw and not is_rank_text(d_raw):
+            d = clean_and_canonicalize_role(d_raw)
+            if d:
+                roles_out.append(d)
+
+    # 3) Post Type only if non-rank AND only if designation & desc gave nothing
+    if not roles_out:
+        pt_raw = r.get('post_type') or ''
+        if pt_raw and not is_rank_text(pt_raw):
+            p = clean_and_canonicalize_role(pt_raw)
+            if p:
+                roles_out.append(p)
+
+    # Final per-row dedupe
+    clean = []
+    seen = set()
+    for x in roles_out:
+        key = x.casefold()
         if key not in seen:
-            seen[key] = (source, role, orig_len)
-        else:
-            # Replace if new source is better (designation_desc > designation > post_type)
-            source_priority = {'designation_desc': 0, 'designation': 1, 'post_type': 2}
-            curr_source, curr_role, curr_len = seen[key]
-            new_priority = source_priority.get(source, 3)
-            curr_priority = source_priority.get(curr_source, 3)
-            
-            # Replace if new source has higher priority or same priority but longer
-            if new_priority < curr_priority or (new_priority == curr_priority and orig_len > curr_len):
-                seen[key] = (source, role, orig_len)
-    
-    # Extract just the roles
-    return [role for _, role, _ in seen.values()]
+            seen.add(key)
+            clean.append(x)
+
+    return clean
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""

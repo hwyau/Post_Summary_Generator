@@ -1093,42 +1093,42 @@ for seg in year_ranges:
 
     # Extract roles per row
     def extract_roles_from_row(r):
-        roles_out = []
+    roles_out = []
 
-        # 1) Prefer Designation Description
-        dd_raw = r.get('designation_desc') or ''
+    # 1) If Designation Description exists → USE ONLY THAT
+    dd_raw = r.get('designation_desc') or ''
+    if dd_raw.strip():
         dd = canonicalize_role(expand_role(dd_raw))
         if dd:
             roles_out.append(dd)
-
-        # 2) Add Designation only if description absent/different and not rank
+        # Do NOT read designation at all when desc exists
+    else:
+        # 2) Otherwise fall back to Designation (try to expand if possible)
         d_raw = r.get('designation') or ''
-        if d_raw and not is_rank_text(d_raw):
+        if d_raw.strip() and not is_rank_text(d_raw):
             d = canonicalize_role(expand_role(d_raw))
-            if d and (not dd or d.casefold() != dd.casefold()):
+            if d:
                 roles_out.append(d)
 
-        # 3) Post Type only if non-rank
+    # 3) Post Type only if non-rank AND only if designation & desc gave nothing
+    if not roles_out:
         pt = r.get('post_type') or ''
         if pt and not is_rank_text(pt):
             p = canonicalize_role(expand_role(pt))
             if p:
                 roles_out.append(p)
 
-        # Row-level dedup (case-insensitive)
-        seen = set()
-        clean_list = []
-        for x in roles_out:
-            if not x or x.lower() in {"nan", "none", "null"}:
-                continue
-            key = x.casefold()
-            if key not in seen:
-                seen.add(key)
-                clean_list.append(x)
+    # Final per-row dedupe
+    clean = []
+    seen = set()
+    for x in roles_out:
+        key = x.casefold()
+        if key not in seen:
+            seen.add(key)
+            clean.append(x)
 
-        # Row-level consolidation (e.g., Platoon N vs Platoon N Commander)
-        clean_list = consolidate_row_roles(clean_list)
-        return clean_list
+    return clean
+    
 
     sub['role_list'] = sub.apply(extract_roles_from_row, axis=1)
 
