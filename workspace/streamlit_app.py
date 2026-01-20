@@ -461,6 +461,63 @@ def normalize_whitespace_and_punctuation(text: str) -> str:
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
+def is_abbreviation_of(abbrev: str, full: str) -> bool:
+    """
+    Check if abbrev is likely an abbreviation of full.
+    Returns True if abbrev could be the short form of full.
+    
+    Examples:
+      - "Ach Lia" is abbreviation of "Architectural Liaison"
+      - "Pub" is abbreviation of "Publicity"
+      - "Sa" is abbreviation of "Security Advisory Section"
+    """
+    abbrev = abbrev.strip().lower()
+    full = full.strip().lower()
+    
+    if not abbrev or not full or len(abbrev) >= len(full):
+        return False
+    
+    # Split into words
+    abbrev_words = abbrev.split()
+    full_words = full.split()
+    
+    # If abbrev has fewer words, check if each abbrev word starts with each full word
+    if len(abbrev_words) == len(full_words):
+        # Check if each word in abbrev is the first letter(s) of the corresponding full word
+        for aw, fw in zip(abbrev_words, full_words):
+            if not fw.startswith(aw):
+                return False
+        return True
+    
+    return False
+
+def pick_best_designations(roles_out: list) -> list:
+    """
+    Remove abbreviations when their full form is present.
+    Keeps only the longer/fuller version of designation pairs.
+    """
+    if len(roles_out) <= 1:
+        return roles_out
+    
+    # Mark roles to remove
+    to_remove = set()
+    
+    for i, role1 in enumerate(roles_out):
+        if i in to_remove:
+            continue
+        for j, role2 in enumerate(roles_out):
+            if i == j or j in to_remove:
+                continue
+            # Check if one is an abbreviation of the other
+            if is_abbreviation_of(role1, role2):
+                # role1 is abbreviation of role2, so remove role1
+                to_remove.add(i)
+            elif is_abbreviation_of(role2, role1):
+                # role2 is abbreviation of role1, so remove role2
+                to_remove.add(j)
+    
+    return [r for i, r in enumerate(roles_out) if i not in to_remove]
+
 def clean_and_canonicalize_role(raw_role: str) -> str:
     """Clean, expand, canonicalize, and format a single role."""
     if _is_blankish(raw_role):
@@ -548,42 +605,45 @@ def cleanup_role_variants(role):
     return cleaned
 
 def extract_roles_from_row(r):
-    """Extract and canonicalize roles from a row."""
+    """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     roles_out = []
     
-    # 1) Prefer Designation Description
+    # Collect all raw role candidates
+    candidates = []
+    
+    # 1) Designation Description (often the full form)
     dd_raw = r.get('designation_desc') or ''
     if dd_raw and not is_rank_text(dd_raw):
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
-            roles_out.append(dd)
+            candidates.append((dd, len(str(dd_raw))))  # Store with original length for comparison
     
-    # 2) Add Designation if non-rank and different
+    # 2) Designation (often abbreviated)
     d_raw = r.get('designation') or ''
     if d_raw and not is_rank_text(d_raw):
         d = clean_and_canonicalize_role(d_raw)
-        if d and (not roles_out or d.casefold() != roles_out[0].casefold()):
-            roles_out.append(d)
+        if d:
+            candidates.append((d, len(str(d_raw))))
     
     # 3) Post Type only if non-rank
     pt_raw = r.get('post_type') or ''
     if pt_raw and not is_rank_text(pt_raw):
         p = clean_and_canonicalize_role(pt_raw)
         if p:
-            roles_out.append(p)
+            candidates.append((p, len(str(pt_raw))))
     
-    # Deduplicate (case-insensitive)
-    seen = set()
-    clean_list = []
-    for x in roles_out:
-        if not x or x.lower() in {"nan", "none", "null"}:
+    # Deduplicate & prefer longer forms (full names over abbreviations)
+    seen = {}  # Maps canonical form to (role, length)
+    for role, orig_len in candidates:
+        if not role or role.lower() in {"nan", "none", "null"}:
             continue
-        key = x.casefold()
-        if key not in seen:
-            seen.add(key)
-            clean_list.append(x)
+        key = role.casefold()
+        # Keep the longer version if we've seen this role before
+        if key not in seen or orig_len > seen[key][1]:
+            seen[key] = (role, orig_len)
     
-    return clean_list
+    # Extract just the roles (drop length info)
+    return [role for role, _ in seen.values()]
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""

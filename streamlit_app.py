@@ -552,42 +552,45 @@ def cleanup_role_variants(role):
     return cleaned
 
 def extract_roles_from_row(r):
-    """Extract and canonicalize roles from a row."""
+    """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     roles_out = []
     
-    # 1) Prefer Designation Description
+    # Collect all raw role candidates
+    candidates = []
+    
+    # 1) Designation Description (often the full form)
     dd_raw = r.get('designation_desc') or ''
     if dd_raw and not is_rank_text(dd_raw):
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
-            roles_out.append(dd)
+            candidates.append((dd, len(str(dd_raw))))  # Store with original length for comparison
     
-    # 2) Add Designation if non-rank and different
+    # 2) Designation (often abbreviated)
     d_raw = r.get('designation') or ''
     if d_raw and not is_rank_text(d_raw):
         d = clean_and_canonicalize_role(d_raw)
-        if d and (not roles_out or d.casefold() != roles_out[0].casefold()):
-            roles_out.append(d)
+        if d:
+            candidates.append((d, len(str(d_raw))))
     
     # 3) Post Type only if non-rank
     pt_raw = r.get('post_type') or ''
     if pt_raw and not is_rank_text(pt_raw):
         p = clean_and_canonicalize_role(pt_raw)
         if p:
-            roles_out.append(p)
+            candidates.append((p, len(str(pt_raw))))
     
-    # Deduplicate (case-insensitive)
-    seen = set()
-    clean_list = []
-    for x in roles_out:
-        if not x or x.lower() in {"nan", "none", "null"}:
+    # Deduplicate & prefer longer forms (full names over abbreviations)
+    seen = {}  # Maps canonical form to (role, length)
+    for role, orig_len in candidates:
+        if not role or role.lower() in {"nan", "none", "null"}:
             continue
-        key = x.casefold()
-        if key not in seen:
-            seen.add(key)
-            clean_list.append(x)
+        key = role.casefold()
+        # Keep the longer version if we've seen this role before
+        if key not in seen or orig_len > seen[key][1]:
+            seen[key] = (role, orig_len)
     
-    return clean_list
+    # Extract just the roles (drop length info)
+    return [role for role, _ in seen.values()]
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
