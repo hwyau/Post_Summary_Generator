@@ -948,7 +948,10 @@ def generate_word_document(enhanced_ranges):
         # Build posting info text
         posting_info = []
         if locations:
-            for loc in locations:
+            for i, loc in enumerate(locations):
+                # Add blank line before location (except for first one)
+                if i > 0:
+                    posting_info.append("")
                 posting_info.append(f"{loc}")
                 roles = roles_by_location.get(loc, [])
                 if roles:
