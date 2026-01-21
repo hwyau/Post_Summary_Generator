@@ -106,4 +106,10 @@ if uploaded_file is not None:
 		generate_word_document(expanded_data, output_path)
 		
 		st.success("Processing complete. Download the Word document below.")
-		st.download_button("Download Word Document", data=open(output_path, "rb").read(), file_name=output_path, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		st.download_button(
+			label="📥 Download Word Document",
+			data=doc_bytes.getvalue(),
+			file_name="HKPF_Posting_Summary.docx",
+			mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			use_container_width=True
+		)
