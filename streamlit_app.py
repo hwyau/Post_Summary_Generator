@@ -1,7 +1,190 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "workspace"))
-import streamlit_app
+import streamlit as st
+import pandas as pd
+import re
+import json
+from pathlib import Path
+
+st.set_page_config(page_title="HKPF Posting Summary Generator", layout="wide")
+st.title("📊 HKPF Posting Summary Generator")
+st.write("Upload an Excel file to generate a professional posting summary Word document")
+
+uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+
+if not uploaded_file:
+    st.info("Please upload an Excel file to begin.")
+    st.stop()
+
+def clean_role_token(txt):
+    if pd.isna(txt) or str(txt).strip().lower() in {"", "nan", "none", "null", "-"}:
+        return ""
+    s = str(txt).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+CANON_SYNONYMS = {
+    r'\\bCMU\\s*REL\\b': 'Community Relations',
+    r'^CMU REL$': 'Community Relations',
+    r'^C M U REL$': 'Community Relations',
+    r'^COMMUNITY RELATIONS$': 'Community Relations',
+    r'^COMM REL$': 'Community Relations',
+}
+
+def canonicalize_role(name):
+    s = clean_role_token(name)
+    if not s:
+        return ""
+    for pattern, repl in CANON_SYNONYMS.items():
+        s = re.sub(pattern, repl, s, flags=re.IGNORECASE)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def get_final_designation(row):
+    desc = str(row.get('designation_desc', '') or '').strip()
+    if desc and desc.lower() not in {"", "nan", "none", "null", "-"}:
+        return desc
+    desig = str(row.get('designation', '') or '').strip()
+    if desig and desig.lower() not in {"", "nan", "none", "null", "-"}:
+        return desig
+    return ''
+
+def deduplicate_roles(role_list):
+    # Canonicalize and keep only the longest unique form for each normalized key
+    norm_map = {}
+    for r in role_list:
+        canon = canonicalize_role(r)
+        key = re.sub(r'[^a-z0-9]', '', canon.casefold())
+        if not key:
+            continue
+        if key not in norm_map or len(canon) > len(norm_map[key]):
+            norm_map[key] = canon
+    # Remove abbreviations if a full form exists
+    final_roles = set(norm_map.values())
+    to_remove = set()
+    for r1 in final_roles:
+        for r2 in final_roles:
+            if r1 == r2:
+                continue
+            r1_norm = re.sub(r'\s+', '', r1).lower()
+            r2_norm = re.sub(r'\s+', '', r2).lower()
+            if r1_norm != r2_norm and r1_norm in r2_norm:
+                to_remove.add(r1)
+    deduped = [r for r in sorted(final_roles - to_remove)]
+    # Final aggressive dedup: remove any role that matches (case-insensitive, ignoring spaces) any other role already in the list
+    truly_unique = []
+    seen_norms = set()
+    for r in deduped:
+        norm = re.sub(r'\s+', '', r).lower()
+        if norm not in seen_norms:
+            truly_unique.append(r)
+            seen_norms.add(norm)
+    return truly_unique
+
+@st.cache_data(show_spinner=False)
+def process_excel(file):
+    df = pd.read_excel(file)
+    # Ensure columns
+    for col in ['designation', 'designation_desc', 'location', 'location_desc']:
+        if col not in df.columns:
+            df[col] = ''
+    df['final_designation'] = df.apply(get_final_designation, axis=1)
+    df['designation'] = df['final_designation']
+    df['designation_desc'] = df['final_designation']
+    # Use location_desc if present, else location
+    df['final_location'] = df['location_desc'].where(
+        df['location_desc'].astype(str).str.strip().ne(''),
+        df['location']
+    )
+    # Group by location, collect roles
+    loc_roles = {}
+    for _, row in df.iterrows():
+        loc = str(row['final_location']).strip()
+        if not loc:
+            continue
+        role = row['final_designation']
+        if not role:
+            continue
+        loc_roles.setdefault(loc, []).append(role)
+    # Deduplicate roles for each location
+    for loc in loc_roles:
+        loc_roles[loc] = deduplicate_roles(loc_roles[loc])
+    return loc_roles
+
+loc_roles = process_excel(uploaded_file)
+
+st.header("Summary by Location")
+for loc, roles in loc_roles.items():
+    st.markdown(f"**{loc}**")
+    for r in roles:
+        st.markdown(f"- {r}")
+    st.markdown("")
+import streamlit as st
+import pandas as pd
+import re
+import json
+from pathlib import Path
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
+from datetime import datetime
+import io
+
+st.set_page_config(page_title="HKPF Posting Summary Generator", layout="wide")
+
+st.title("📊 HKPF Posting Summary Generator")
+st.write("Upload an Excel file to generate a professional posting summary Word document")
+
+# ========= VOCAB + CONFIGURATION =========
+STARTER_ROLE_EXPANSIONS = {
+    "CSP": "Chief Superintendent",
+    "SSP": "Senior Superintendent",
+    "SP": "Superintendent",
+    "CIP": "Chief Inspector",
+    "SIP": "Senior Inspector",
+    "IP": "Inspector",
+    "PI": "Probationary Inspector",
+    "SSGT": "Station Sergeant",
+    "SGT": "Sergeant",
+    "SPC": "Senior Police Constable",
+    "PC": "Police Constable",
+    "DC": "District Commander",
+    "DDC": "Deputy District Commander",
+    "ADC": "Assistant District Commander",
+    "ADM": "Administration",
+    "A&S": "Administration and Support",
+    "CRM": "Crime",
+    "ES": "Efficiency Studies",
+    "RI": "Research and Inspections",
+    "CTRL": "Command and Control (Control Room)",
+    "GEN": "General",
+    "FLD": "Field",
+    "PSU 1": "Patrol Sub-unit 1",
+    "PSU 2": "Patrol Sub-unit 2",
+    "PSU 3": "Patrol Sub-unit 3",
+    "PSU 4": "Patrol Sub-unit 4",
+    "TFSU": "Task Force Sub-unit",
+    "DVIT 1": "Divisional Investigation Team 1",
+    "DVIT 2": "Divisional Investigation Team 2",
+    "DVIT 3": "Divisional Investigation Team 3",
+    "DVIT 4": "Divisional Investigation Team 4",
+    "DVIT 5": "Divisional Investigation Team 5",
+    "DVIT 6": "Divisional Investigation Team 6",
+    "DVIT 7": "Divisional Investigation Team 7",
+    "DVIT 8": "Divisional Investigation Team 8",
+    "SDS 1": "Special Duties Squad 1",
+    "DSDS 2": "District Special Duties Squad 2",
+    "SYMPOSIUM": "Symposium",
+    "RPC TRG (INTAKE)": "Recruit Police Constable Training (Intake)",
+    "CS&INT": "Counterfeit, Support and Intelligence",
+    "INP 2": "Inspection 2",
+    "AUX": "Auxiliary",
+    "SCIU": "Security Company and Guarding Services Bill-Police Inspection Team",
+    "SA": "Security Advisory Section",
+    "PCRO": "Police Community Relations Office",
+}
+
+STARTER_LOCATION_ALIASES = {
     # Districts (normalized forms) - VERIFIED
     "CDIST": "CENTRAL DISTRICT",
     "CDIV": "CENTRAL DIVISION",
@@ -247,7 +430,7 @@ CANON_SYNONYMS = {
     r'\bR\s*and\s+I\b': 'Research and Inspections',
     r'\bResearch\s+&\s+Inspections\b': 'Research and Inspections',
     
-    # T / Traffic (unit/department acronym - standalone only)
+    # T / Traffic (unit/department acronym - only standalone T)
     r'^T$': 'Traffic',
     
     # Inspection / INP / Inspection variants
@@ -323,6 +506,12 @@ CANON_SYNONYMS = {
     r'\bTFSU\b': 'Task Force Sub-unit',
     
     # PCRO / Police Community Relations Office
+    # Community relations (force all variants to canonical form)
+    r'\bCMU\s*REL\b': 'Community Relations',
+    r'^CMU REL$': 'Community Relations',
+    r'^C M U REL$': 'Community Relations',
+    r'^COMMUNITY RELATIONS$': 'Community Relations',
+    r'^COMM REL$': 'Community Relations',
     r'\bPCRO\b': 'Police Community Relations Office',
     
     # ES / Efficiency Studies
@@ -336,10 +525,6 @@ CANON_SYNONYMS = {
     # FLD / Field
     r'^FLD$': 'Field',
     r'\bFLD\b': 'Field',
-    
-    # PTU / Police Tactical Unit (all variants: A, W, W COY, etc.)
-    r'^PTU\b.*': 'Police Tactical Unit',
-    r'\bPTU\b.*': 'Police Tactical Unit',
     
     # ADC / Assistant Divisional Commander
     r'^ADC$': 'Assistant Divisional Commander',
@@ -421,6 +606,64 @@ def normalize_whitespace_and_punctuation(text: str) -> str:
     # Collapse multiple spaces
     s = re.sub(r'\s+', ' ', s).strip()
     return s
+
+def is_abbreviation_of(abbrev: str, full: str) -> bool:
+    """
+    Check if abbrev is likely an abbreviation of full.
+    Returns True if abbrev could be the short form of full.
+    
+    Examples:
+      - "Ach Lia" is abbreviation of "Architectural Liaison"
+      - "Pub" is abbreviation of "Publicity"
+      - "Sa" is abbreviation of "Security Advisory Section"
+    """
+    abbrev = abbrev.strip().lower()
+    full = full.strip().lower()
+    
+    if not abbrev or not full or len(abbrev) >= len(full):
+        return False
+    
+    # Split into words
+    abbrev_words = abbrev.split()
+    full_words = full.split()
+    
+    # If abbrev has fewer words, check if each abbrev word starts with or is in each full word
+    if len(abbrev_words) == len(full_words):
+        # Check if each word in abbrev is the first letter(s) of the corresponding full word or appears in it
+        for aw, fw in zip(abbrev_words, full_words):
+            if not (fw.startswith(aw) or aw in fw):
+                return False
+        return True
+    
+    return False
+
+
+def pick_best_designations(roles_out: list) -> list:
+    """
+    Remove abbreviations when their full form is present.
+    Keeps only the longer/fuller version of designation pairs.
+    """
+    if len(roles_out) <= 1:
+        return roles_out
+    
+    # Mark roles to remove
+    to_remove = set()
+    
+    for i, role1 in enumerate(roles_out):
+        if i in to_remove:
+            continue
+        for j, role2 in enumerate(roles_out):
+            if i == j or j in to_remove:
+                continue
+            # Check if one is an abbreviation of the other
+            if is_abbreviation_of(role1, role2):
+                # role1 is abbreviation of role2, so remove role1
+                to_remove.add(i)
+            elif is_abbreviation_of(role2, role1):
+                # role2 is abbreviation of role1, so remove role2
+                to_remove.add(j)
+    
+    return [r for i, r in enumerate(roles_out) if i not in to_remove]
 
 def clean_and_canonicalize_role(raw_role: str) -> str:
     """Clean, expand, canonicalize, and format a single role."""
@@ -530,55 +773,29 @@ def is_abbreviation_of(short, long):
 def extract_roles_from_row(r):
     """Extract and canonicalize roles from a row, preferring full forms over abbreviations."""
     
-    # Collect all raw role candidates with their source and length
-    candidates = []
-    
-    # 1) Designation Description (priority 1 - usually full form)
+    roles_out = []
     dd_raw = r.get('designation_desc') or ''
+    d_raw = r.get('designation') or ''
+
     if dd_raw and not is_rank_text(dd_raw):
+        # Only use Designation (Description) if present
         dd = clean_and_canonicalize_role(dd_raw)
         if dd:
-            candidates.append(('designation_desc', dd, len(str(dd_raw))))
-    
-    # 2) Designation (priority 2 - often abbreviated)
-    d_raw = r.get('designation') or ''
-    if d_raw and not is_rank_text(d_raw):
+            roles_out.append(dd)
+    elif d_raw and not is_rank_text(d_raw):
+        # Only use Designation if desc is empty
         d = clean_and_canonicalize_role(d_raw)
         if d:
-            candidates.append(('designation', d, len(str(d_raw))))
-    
-    # 3) Post Type (priority 3)
-    pt_raw = r.get('post_type') or ''
-    if pt_raw and not is_rank_text(pt_raw):
-        p = clean_and_canonicalize_role(pt_raw)
-        if p:
-            candidates.append(('post_type', p, len(str(pt_raw))))
-    
-    # Deduplicate & prefer:
-    # 1) Roles from "designation_desc" (usually full form)
-    # 2) Then longer versions of the same role
-    seen = {}  # Maps canonical form to (source, role, length)
-    for source, role, orig_len in candidates:
-        if not role or role.lower() in {"nan", "none", "null"}:
-            continue
-        key = role.casefold()
-        
-        # If we haven't seen this role, add it
-        if key not in seen:
-            seen[key] = (source, role, orig_len)
-        else:
-            # Replace if new source is better (designation_desc > designation > post_type)
-            source_priority = {'designation_desc': 0, 'designation': 1, 'post_type': 2}
-            curr_source, curr_role, curr_len = seen[key]
-            new_priority = source_priority.get(source, 3)
-            curr_priority = source_priority.get(curr_source, 3)
-            
-            # Replace if new source has higher priority or same priority but longer
-            if new_priority < curr_priority or (new_priority == curr_priority and orig_len > curr_len):
-                seen[key] = (source, role, orig_len)
-    
-    # Extract just the roles
-    return [role for _, role, _ in seen.values()]
+            roles_out.append(d)
+    else:
+        # Only if both are empty, fallback to post_type
+        pt_raw = r.get('post_type') or ''
+        if pt_raw and not is_rank_text(pt_raw):
+            p = clean_and_canonicalize_role(pt_raw)
+            if p:
+                roles_out.append(p)
+
+    return roles_out
 
 def process_excel_file(uploaded_file):
     """Process the uploaded Excel file and return enhanced ranges."""
@@ -609,9 +826,25 @@ def process_excel_file(uploaded_file):
                 df[col] = pd.to_datetime(df[col], errors='coerce')
         
         # Ensure columns exist
+
+        # Ensure presence of text columns
         for col in ['post_type', 'post_type_desc', 'designation', 'designation_desc', 'location', 'location_desc']:
             if col not in df.columns:
                 df[col] = ""
+
+        # Force only Designation (Description) to be used, unless empty, then use Designation
+        def get_final_designation(row):
+            desc = str(row.get('designation_desc', '') or '').strip()
+            if desc and desc.lower() not in {"", "nan", "none", "null", "-"}:
+                return desc
+            desig = str(row.get('designation', '') or '').strip()
+            if desig and desig.lower() not in {"", "nan", "none", "null", "-"}:
+                return desig
+            return ''
+
+        df['final_designation'] = df.apply(get_final_designation, axis=1)
+        df['designation'] = df['final_designation']
+        df['designation_desc'] = df['final_designation']
         
         # Sort
         if 'date_start' in df.columns and df['date_start'].notna().any():
@@ -865,18 +1098,40 @@ def process_excel_file(uploaded_file):
             # Clean up all roles: standardize Room/Rm, remove numbered variants, deduplicate
             for loc_name in roles_by_loc:
                 roles = roles_by_loc[loc_name]
-                cleaned_roles = []
-                seen = set()
-                for role in roles:
-                    # Apply variant cleanup (Room/Rm standardization, remove numbers)
-                    cleaned = cleanup_role_variants(role)
-                    if cleaned:
-                        # Deduplicate after cleanup
-                        key = cleaned.casefold()
-                        if key not in seen:
-                            seen.add(key)
-                            cleaned_roles.append(cleaned)
-                roles_by_loc[loc_name] = cleaned_roles
+                # Canonicalize all roles again to ensure all variants are expanded
+                canonical_roles = [clean_and_canonicalize_role(r) for r in roles]
+                # Strict normalization: keep only the longest (most complete) unique role for each normalized key
+                norm_map = {}
+                for r in canonical_roles:
+                    key = re.sub(r'[^a-z0-9]', '', r.casefold())
+                    if not key:
+                        continue
+                    # Always keep the longest version for each key
+                    if key not in norm_map or len(r) > len(norm_map[key]):
+                        norm_map[key] = r
+                # Remove abbreviations if a full form exists (e.g., 'Cmu Rel' vs 'Community Relations')
+                # If two roles are similar and one is a substring of the other, keep only the longer one
+                final_roles = set(norm_map.values())
+                to_remove = set()
+                for r1 in final_roles:
+                    for r2 in final_roles:
+                        if r1 == r2:
+                            continue
+                        # Remove r1 if it is a substring of r2 (case-insensitive, ignore spaces)
+                        r1_norm = re.sub(r'\s+', '', r1).lower()
+                        r2_norm = re.sub(r'\s+', '', r2).lower()
+                        if r1_norm != r2_norm and r1_norm in r2_norm:
+                            to_remove.add(r1)
+                deduped = [r for r in sorted(final_roles - to_remove)]
+                # Final aggressive dedup: remove any role that matches (case-insensitive, ignoring spaces) any other role already in the list
+                truly_unique = []
+                seen_norms = set()
+                for r in deduped:
+                    norm = re.sub(r'\s+', '', r).lower()
+                    if norm not in seen_norms:
+                        truly_unique.append(r)
+                        seen_norms.add(norm)
+                roles_by_loc[loc_name] = truly_unique
             
             # Rebuild unique locations list without Divisions
             final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
