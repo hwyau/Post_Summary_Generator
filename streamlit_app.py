@@ -2,42 +2,6 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "workspace"))
 import streamlit_app
-    "ADC": "Assistant District Commander",
-    "ADM": "Administration",
-    "A&S": "Administration and Support",
-    "CRM": "Crime",
-    "ES": "Efficiency Studies",
-    "RI": "Research and Inspections",
-    "CTRL": "Command and Control (Control Room)",
-    "GEN": "General",
-    "FLD": "Field",
-    "PSU 1": "Patrol Sub-unit 1",
-    "PSU 2": "Patrol Sub-unit 2",
-    "PSU 3": "Patrol Sub-unit 3",
-    "PSU 4": "Patrol Sub-unit 4",
-    "TFSU": "Task Force Sub-unit",
-    "DVIT 1": "Divisional Investigation Team 1",
-    "DVIT 2": "Divisional Investigation Team 2",
-    "DVIT 3": "Divisional Investigation Team 3",
-    "DVIT 4": "Divisional Investigation Team 4",
-    "DVIT 5": "Divisional Investigation Team 5",
-    "DVIT 6": "Divisional Investigation Team 6",
-    "DVIT 7": "Divisional Investigation Team 7",
-    "DVIT 8": "Divisional Investigation Team 8",
-    "SDS 1": "Special Duties Squad 1",
-    "DSDS 2": "District Special Duties Squad 2",
-    "SYMPOSIUM": "Symposium",
-    "RPC TRG (INTAKE)": "Recruit Police Constable Training (Intake)",
-    "CS&INT": "Counterfeit, Support and Intelligence",
-    "INP 2": "Inspection 2",
-    "AUX": "Auxiliary",
-    "SCIU": "Security Company and Guarding Services Bill-Police Inspection Team",
-    "SA": "Security Advisory Section",
-    "PCRO": "Police Community Relations Office",
-}
-
-
-STARTER_LOCATION_ALIASES = {
     # Districts (normalized forms) - VERIFIED
     "CDIST": "CENTRAL DISTRICT",
     "CDIV": "CENTRAL DIVISION",
