@@ -10,14 +10,6 @@ st.write("Upload an Excel file to generate a professional posting summary Word d
 
 uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
-if not uploaded_file:
-    s = str(txt).strip()
-    s = re.sub(r'\s+', ' ', s).strip()
-    return s
-CANON_SYNONYMS = {
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-st.set_page_config(page_title="HKPF Posting Summary Generator", layout="wide")
-
 st.title("📊 HKPF Posting Summary Generator")
 st.write("Upload an Excel file to generate a professional posting summary Word document")
 
