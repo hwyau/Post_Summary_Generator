@@ -78,9 +78,12 @@ def expand_role_abbreviations(posting_data):
 	# ...existing code for expanding role abbreviations...
 	pass
 
-def generate_word_document(expanded_data, output_path):
-	# ...existing code for generating Word document...
-	pass
+
+def generate_word_document(expanded_data):
+	# ...existing code for generating Word document, but return Document object...
+	doc = Document()
+	# (populate doc as needed)
+	return doc
 
 # Streamlit app layout
 st.sidebar.header("Upload Excel File")
@@ -101,10 +104,11 @@ if uploaded_file is not None:
 		st.subheader("Expanded Posting Data")
 		st.write(expanded_data)
 		
-		# Generate Word document
-		output_path = "posting_summary.docx"
-		generate_word_document(expanded_data, output_path)
-		
+		# Generate Word document in memory
+		doc = generate_word_document(expanded_data)
+		doc_bytes = io.BytesIO()
+		doc.save(doc_bytes)
+		doc_bytes.seek(0)
 		st.success("Processing complete. Download the Word document below.")
 		st.download_button(
 			label="📥 Download Word Document",
