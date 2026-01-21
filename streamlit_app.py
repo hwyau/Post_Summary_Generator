@@ -1,23 +1,7 @@
-st.set_page_config(page_title="HKPF Posting Summary Generator", layout="wide")
-st.title("📊 HKPF Posting Summary Generator")
-st.write("Upload an Excel file to generate a professional posting summary Word document")
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "workspace"))
 import streamlit_app
-    "CSP": "Chief Superintendent",
-    "SSP": "Senior Superintendent",
-    "SP": "Superintendent",
-    "CIP": "Chief Inspector",
-    "SIP": "Senior Inspector",
-    "IP": "Inspector",
-    "PI": "Probationary Inspector",
-    "SSGT": "Station Sergeant",
-    "SGT": "Sergeant",
-    "SPC": "Senior Police Constable",
-    "PC": "Police Constable",
-    "DC": "District Commander",
-    "DDC": "Deputy District Commander",
     "ADC": "Assistant District Commander",
     "ADM": "Administration",
     "A&S": "Administration and Support",
