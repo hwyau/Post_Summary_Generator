@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import re
@@ -65,5 +64,46 @@ STARTER_ROLE_EXPANSIONS = {
 	"SA": "Security Advisory Section",
 	"PCRO": "Police Community Relations Office",
 }
-...existing code from /workspaces/Post_Summary_Generator/workspace/streamlit_app.py (lines 61-1175) pasted here...
-...existing code from workspace/streamlit_app.py continues...
+
+# Define functions
+def extract_data_from_excel(file):
+	df = pd.read_excel(file, sheet_name=None)
+	return df
+
+def extract_posting_data(df):
+	# ...existing code for extracting posting data...
+	pass
+
+def expand_role_abbreviations(posting_data):
+	# ...existing code for expanding role abbreviations...
+	pass
+
+def generate_word_document(expanded_data, output_path):
+	# ...existing code for generating Word document...
+	pass
+
+# Streamlit app layout
+st.sidebar.header("Upload Excel File")
+uploaded_file = st.sidebar.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file is not None:
+	with st.spinner("Processing file..."):
+		# Extract data from Excel
+		all_data = extract_data_from_excel(uploaded_file)
+		
+		# Extract posting data
+		posting_data = extract_posting_data(all_data)
+		
+		# Expand role abbreviations
+		expanded_data = expand_role_abbreviations(posting_data)
+		
+		# Display expanded data in Streamlit
+		st.subheader("Expanded Posting Data")
+		st.write(expanded_data)
+		
+		# Generate Word document
+		output_path = "posting_summary.docx"
+		generate_word_document(expanded_data, output_path)
+		
+		st.success("Processing complete. Download the Word document below.")
+		st.download_button("Download Word Document", data=open(output_path, "rb").read(), file_name=output_path, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
