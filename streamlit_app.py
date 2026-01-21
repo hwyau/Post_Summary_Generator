@@ -13,7 +13,7 @@ import io
 
 st.set_page_config(page_title="HKPF Posting Summary Generator", layout="wide")
 
-st.title("\ud83d\udcca HKPF Posting Summary Generator")
+st.title("📊 HKPF Posting Summary Generator")
 st.write("Upload an Excel file to generate a professional posting summary Word document")
 
 # ========= VOCAB + CONFIGURATION =========
