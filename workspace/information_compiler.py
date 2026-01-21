@@ -421,25 +421,9 @@ for col in ['date_start', 'date_end']:
         df[col] = pd.to_datetime(df[col], errors='coerce')
 
 # Ensure presence of text columns
-
-# Ensure presence of text columns
 for col in ['post_type', 'post_type_desc', 'designation', 'designation_desc', 'location', 'location_desc']:
     if col not in df.columns:
         df[col] = ""
-
-# Force only Designation (Description) to be used, unless empty, then use Designation
-def get_final_designation(row):
-    desc = str(row.get('designation_desc', '') or '').strip()
-    if desc and desc.lower() not in {"", "nan", "none", "null", "-"}:
-        return desc
-    desig = str(row.get('designation', '') or '').strip()
-    if desig and desig.lower() not in {"", "nan", "none", "null", "-"}:
-        return desig
-    return ''
-
-df['final_designation'] = df.apply(get_final_designation, axis=1)
-df['designation'] = df['final_designation']
-df['designation_desc'] = df['final_designation']
 
 # ========= STEP 3: RANK MAPPING (IP/SIP preserved & enforced) =========
 rank_order = ['PC', 'SPC', 'SGT', 'SSGT', 'PI', 'IP', 'SIP', 'CIP', 'SP', 'SSP', 'CSP', 'ACP', 'SACP', 'DCP', 'CP']
@@ -1113,28 +1097,40 @@ for seg in year_ranges:
     # Extract roles per row
 def extract_roles_from_row(r):
     roles_out = []
-    dd_raw = r.get('designation_desc') or ''
-    d_raw = r.get('designation') or ''
 
+    # 1) If Designation Description exists → USE ONLY THAT
+    dd_raw = r.get('designation_desc') or ''
     if dd_raw.strip():
-        # Only use Designation (Description) if present
         dd = canonicalize_role(expand_role(dd_raw))
         if dd:
             roles_out.append(dd)
-    elif d_raw.strip() and not is_rank_text(d_raw):
-        # Only use Designation if desc is empty
-        d = canonicalize_role(expand_role(d_raw))
-        if d:
-            roles_out.append(d)
+        # Do NOT read designation at all when desc exists
     else:
-        # Only if both are empty, fallback to post_type
+        # 2) Otherwise fall back to Designation (try to expand if possible)
+        d_raw = r.get('designation') or ''
+        if d_raw.strip() and not is_rank_text(d_raw):
+            d = canonicalize_role(expand_role(d_raw))
+            if d:
+                roles_out.append(d)
+
+    # 3) Post Type only if non-rank AND only if designation & desc gave nothing
+    if not roles_out:
         pt = r.get('post_type') or ''
         if pt and not is_rank_text(pt):
             p = canonicalize_role(expand_role(pt))
             if p:
                 roles_out.append(p)
 
-    return roles_out
+    # Final per-row dedupe
+    clean = []
+    seen = set()
+    for x in roles_out:
+        key = x.casefold()
+        if key not in seen:
+            seen.add(key)
+            clean.append(x)
+
+    return clean
     
 
     sub['role_list'] = sub.apply(extract_roles_from_row, axis=1)
@@ -1224,38 +1220,27 @@ def extract_roles_from_row(r):
         roles = roles_by_loc[loc_name]
         # Canonicalize all roles again to ensure all variants are expanded
         canonical_roles = [canonicalize_role(r) for r in roles]
-        # Strict normalization: keep only the longest (most complete) unique role for each normalized key
-        norm_map = {}
+        # Deduplicate after canonicalization
+        unique_roles = []
+        seen = set()
         for r in canonical_roles:
             key = re.sub(r'[^a-z0-9]', '', r.casefold())
-            if not key:
-                continue
-            # Always keep the longest version for each key
-            if key not in norm_map or len(r) > len(norm_map[key]):
-                norm_map[key] = r
-        # Remove abbreviations if a full form exists (e.g., 'Cmu Rel' vs 'Community Relations')
-        # If two roles are similar and one is a substring of the other, keep only the longer one
-        final_roles = set(norm_map.values())
+            if key not in seen and r:
+                seen.add(key)
+                unique_roles.append(r)
+        # Fuzzy deduplication: remove any role that is a substring, abbreviation, or fuzzy match of a longer role in the same list
         to_remove = set()
-        for r1 in final_roles:
-            for r2 in final_roles:
-                if r1 == r2:
+        def norm(s):
+            return re.sub(r'[^a-z0-9]', '', s.casefold())
+        for i, role1 in enumerate(unique_roles):
+            for j, role2 in enumerate(unique_roles):
+                if i == j:
                     continue
-                # Remove r1 if it is a substring of r2 (case-insensitive, ignore spaces)
-                r1_norm = re.sub(r'\s+', '', r1).lower()
-                r2_norm = re.sub(r'\s+', '', r2).lower()
-                if r1_norm != r2_norm and r1_norm in r2_norm:
-                    to_remove.add(r1)
-        deduped = [r for r in sorted(final_roles - to_remove)]
-        # Final aggressive dedup: remove any role that matches (case-insensitive, ignoring spaces) any other role already in the list
-        truly_unique = []
-        seen_norms = set()
-        for r in deduped:
-            norm = re.sub(r'\s+', '', r).lower()
-            if norm not in seen_norms:
-                truly_unique.append(r)
-                seen_norms.add(norm)
-        roles_by_loc[loc_name] = truly_unique
+                n1, n2 = norm(role1), norm(role2)
+                # Remove role1 if it is a substring or abbreviation of role2
+                if n1 != n2 and (n1 in n2 or is_abbreviation_of(role1, role2)):
+                    to_remove.add(i)
+        roles_by_loc[loc_name] = [r for i, r in enumerate(unique_roles) if i not in to_remove]
     
     # Rebuild unique locations list without Divisions
     final_unique_locs = [loc for loc in unique_locs if loc not in division_to_district_merge]
